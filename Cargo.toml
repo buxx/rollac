@@ -1,0 +1,13 @@
+[package]
+name = "rollac"
+version = "0.1.0"
+authors = ["Bastien Sevajol <bastien.sevajol@algoo.fr>"]
+edition = "2018"
+
+[dependencies]
+futures = "0.3.8"
+async-trait = "0.1.42"
+
+[dependencies.async-std]
+version = "1.8.0"
+features = ["unstable"]
