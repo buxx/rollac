@@ -1,43 +1,21 @@
 use crate::ac::{AnimatedCorpse, Type};
-use crate::behavior::Behavior;
 use std::time::Duration;
-
-struct Move {}
-impl Behavior for Move {
-    fn get_execute_at_interval_duration(&self) -> Duration {
-        Duration::from_secs(2)
-    }
-
-    fn execute_once(&self, ac: &Box<dyn AnimatedCorpse + Send + Sync>) {
-        println!("move")
-    }
-}
-
-struct Eat {}
-impl Behavior for Eat {
-    fn get_execute_at_interval_duration(&self) -> Duration {
-        Duration::from_secs(5)
-    }
-
-    fn execute_once(&self, ac: &Box<dyn AnimatedCorpse + Send + Sync>) {
-        println!("eat")
-    }
-}
+use async_std::sync::Mutex;
 
 pub struct Rabbit {
     type_: Type,
-    world_row_i: u16,
-    world_col_i: u16,
-    behaviors: Vec<Box<dyn Behavior>>,
+    world_row_i: u32,
+    world_col_i: u32,
+    counter: i64,
 }
 
 impl Rabbit {
-    pub fn new(world_row_i: u16, world_col_i: u16) -> Self {
+    pub fn new(world_row_i: u32, world_col_i: u32) -> Self {
         Rabbit {
             type_: Type::Rabbit,
             world_row_i,
             world_col_i,
-            behaviors: vec![Box::new(Move {}), Box::new(Eat {})],
+            counter: 0,
         }
     }
 }
@@ -47,15 +25,21 @@ impl AnimatedCorpse for Rabbit {
         self.type_.clone()
     }
 
-    fn get_behaviors(&self) -> &Vec<Box<dyn Behavior>> {
-        &self.behaviors
-    }
-
-    fn get_world_row_i(&self) -> u16 {
+    fn get_world_row_i(&self) -> u32 {
         self.world_row_i
     }
 
-    fn get_world_col_i(&self) -> u16 {
+    fn get_world_col_i(&self) -> u32 {
         self.world_col_i
+    }
+
+    fn apply_event(&mut self) {
+        self.counter += 1;
+        // println!("apply_event: {}", self.counter);
+    }
+
+    fn execute_once(&mut self) {
+        self.counter += 1;
+        // println!("execute_once: {}", self.counter);
     }
 }
