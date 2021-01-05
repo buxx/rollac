@@ -2,22 +2,12 @@ use async_std::pin::Pin;
 use async_std::task;
 use futures::future::join_all;
 use async_std::sync::Mutex;
-use async_std::prelude::*;
-use async_std::stream;
-use async_std::stream::Interval;
 use async_trait::async_trait;
 use std::time::Duration;
 
 mod ac;
 mod zone;
-
-async fn execute_at_interval(ac: &Mutex<Box<dyn ac::AnimatedCorpse + Send + Sync>>) {
-    let duration = ac::get_interval(ac.lock().await.get_type());
-    let mut interval = stream::interval(duration);
-    while let Some(_) = interval.next().await {
-        ac.lock().await.execute_once();
-    }
-}
+mod behavior;
 
 async fn daemon(mut acs: Vec<Mutex<Box<dyn ac::AnimatedCorpse + Send + Sync>>>) {
     let mut zones: Vec<zone::Zone> = vec![];
@@ -37,7 +27,7 @@ async fn daemon(mut acs: Vec<Mutex<Box<dyn ac::AnimatedCorpse + Send + Sync>>>) 
 
     for zone in zones.iter() {
         for ac in zone.get_acs() {
-            futures.push(Box::pin(execute_at_interval(ac)));
+            futures.extend(ac.lock().await.get_futures());
         }
     }
 

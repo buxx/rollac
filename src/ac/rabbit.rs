@@ -1,6 +1,7 @@
 use crate::ac::{AnimatedCorpse, Type};
 use std::time::Duration;
 use async_std::sync::Mutex;
+use crate::behavior::Behavior;
 
 pub struct Rabbit {
     type_: Type,
@@ -20,6 +21,28 @@ impl Rabbit {
     }
 }
 
+struct Move {}
+impl Behavior for Move {
+    fn get_interval(&self) -> Duration {
+        Duration::from_secs(2)
+    }
+
+    fn execute_once(&self) {
+        println!("move")
+    }
+}
+
+struct Eat {}
+impl Behavior for Eat {
+    fn get_interval(&self) -> Duration {
+        Duration::from_secs(5)
+    }
+
+    fn execute_once(&self) {
+        println!("eat")
+    }
+}
+
 impl AnimatedCorpse for Rabbit {
     fn get_type(&self) -> Type {
         self.type_.clone()
@@ -35,11 +58,18 @@ impl AnimatedCorpse for Rabbit {
 
     fn apply_event(&mut self) {
         self.counter += 1;
-        // println!("apply_event: {}", self.counter);
+        println!("apply_event: {}", self.counter);
     }
 
     fn execute_once(&mut self) {
         self.counter += 1;
-        // println!("execute_once: {}", self.counter);
+        println!("execute_once: {}", self.counter);
+    }
+
+    fn get_behaviors(&self) -> Vec<Box<dyn Behavior>> {
+        vec![
+            Box::new(Move {}),
+            Box::new(Eat {}),
+        ]
     }
 }
