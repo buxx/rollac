@@ -1,38 +1,50 @@
-use async_std::task;
-use std::time::Duration;
-
 use crate::ac;
-use async_std::sync::Mutex;
+use crate::ac::rabbit::Rabbit;
+use crate::message::Message;
 
 pub struct Zone {
     world_row_i: u32,
     world_col_i: u32,
-    acs: Vec<Mutex<Box<dyn ac::AnimatedCorpse + Send + Sync>>>,
+    animated_corpses: Vec<Box<dyn ac::AnimatedCorpse + Send + Sync>>,
 }
 
 impl Zone {
     pub fn new(
         world_row_i: u32,
         world_col_i: u32,
-        acs: Vec<Mutex<Box<dyn ac::AnimatedCorpse + Send + Sync>>>,
+        animated_corpses: Vec<Box<dyn ac::AnimatedCorpse + Send + Sync>>,
     ) -> Self {
         Zone {
             world_row_i,
             world_col_i,
-            acs,
+            animated_corpses,
         }
     }
 
-    pub fn get_acs(&self) -> &Vec<Mutex<Box<dyn ac::AnimatedCorpse + Send + Sync>>> {
-        &self.acs
-    }
+    pub fn react(&mut self) -> Vec<Message> {
+        let mut messages: Vec<Message> = vec!();
 
-    pub async fn listen_on_events(&self) {
-        loop {
-            task::sleep(Duration::from_secs(2)).await;
-            for ac in self.acs.iter() {
-                ac.lock().await.apply_event()
+        for animated_corpse in self.animated_corpses.iter_mut() {
+            if let Some(animated_corpse_messages) = animated_corpse.apply_event() {
+                messages.extend(animated_corpse_messages);
             }
         }
+
+        self.animated_corpses.push(Box::new(Rabbit::new(0, 0)));
+        println!("react event (animated_corpse: {})", self.animated_corpses.len());
+
+        messages
+    }
+
+    pub fn animate(&mut self) -> Vec<Message> {
+        let mut messages: Vec<Message> = vec!();
+
+        for animated_corpse in self.animated_corpses.iter_mut() {
+            if let Some(animated_corpse_messages) = animated_corpse.animate() {
+                messages.extend(animated_corpse_messages);
+            }
+        }
+
+        messages
     }
 }

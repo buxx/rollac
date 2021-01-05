@@ -1,6 +1,5 @@
 use crate::ac::{AnimatedCorpse, Type};
-use std::time::Duration;
-use async_std::sync::Mutex;
+use crate::message::Message;
 
 pub struct Rabbit {
     type_: Type,
@@ -22,7 +21,7 @@ impl Rabbit {
 
 impl AnimatedCorpse for Rabbit {
     fn get_type(&self) -> Type {
-        self.type_.clone()
+        self.type_
     }
 
     fn get_world_row_i(&self) -> u32 {
@@ -33,13 +32,14 @@ impl AnimatedCorpse for Rabbit {
         self.world_col_i
     }
 
-    fn apply_event(&mut self) {
+    fn apply_event(&mut self) -> Option<Vec<Message>> {
         self.counter += 1;
-        // println!("apply_event: {}", self.counter);
+        Some(vec![Message::HelloWorldAnimatedCorpse])
     }
 
-    fn execute_once(&mut self) {
+    fn animate(&mut self) -> Option<Vec<Message>> {
         self.counter += 1;
-        // println!("execute_once: {}", self.counter);
+        println!("animate ({})", self.counter);
+        Some(vec![Message::HelloWorldAnimatedCorpse])
     }
 }
