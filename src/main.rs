@@ -1,57 +1,72 @@
+use async_std::channel::{unbounded, Receiver, Sender};
 use async_std::pin::Pin;
 use async_std::sync::Mutex;
 use async_std::task;
 use futures::future::join_all;
 use std::cell::RefCell;
 use std::time::Duration;
-use async_std::channel::{unbounded, Sender, Receiver};
 
-use crate::zone::Zone;
 use crate::ac::AnimatedCorpse;
 use crate::message::Message;
+use crate::zone::Zone;
 
 mod ac;
-mod zone;
 mod message;
+mod zone;
 
 async fn on_events(zones: &Mutex<RefCell<Vec<Zone>>>, channel_sender: &Sender<Message>) {
     loop {
         // Simulate websocket events
         task::sleep(Duration::from_secs(2)).await;
+        let mut messages: Vec<Message> = vec![];
 
         {
             for zone in zones.lock().await.borrow_mut().iter_mut() {
-                for message in zone.react() {
-                    //channel_sender.send(message).await;
-                }
+                messages.extend(zone.react());
             }
-        };
-    };
+        }
+
+        for message in messages {
+            if let Err(_) = channel_sender.send(message).await {
+                panic!("Channel is closed !")
+            }
+        }
+    }
 }
 
 async fn animate(zones: &Mutex<RefCell<Vec<Zone>>>, channel_sender: &Sender<Message>) {
     loop {
         task::sleep(Duration::from_secs(1)).await; // TODO calculate to have 1 fps
+        let mut messages: Vec<Message> = vec![];
+
         {
             for zone in zones.lock().await.borrow_mut().iter_mut() {
-                for message in zone.animate() {
-                    //channel_sender.send(message).await;
-                }
+                messages.extend(zone.animate())
             }
         };
-    };
+
+        for message in messages {
+            if let Err(_) = channel_sender.send(message).await {
+                panic!("Channel is closed !")
+            };
+        }
+    }
 }
 
 async fn on_messages(channel_receiver: Receiver<Message>) {
     while let Ok(message) = channel_receiver.recv().await {
         match message {
-            Message::HelloWorldZone => {println!("HelloWorldZone")}
-            Message::HelloWorldAnimatedCorpse => {println!("HelloWorldAnimatedCorpse")}
+            Message::HelloWorldZone => {
+                println!("HelloWorldZone")
+            }
+            Message::HelloWorldAnimatedCorpse => {
+                println!("HelloWorldAnimatedCorpse")
+            }
         }
-    };
+    }
 
     // TODO: manage daemon close
-    panic!("Channel is closed !")
+    panic!("Channel is closed !");
 }
 
 async fn daemon(mut animated_corpses: Vec<Box<dyn AnimatedCorpse + Send + Sync>>) {

@@ -22,7 +22,7 @@ impl Zone {
     }
 
     pub fn react(&mut self) -> Vec<Message> {
-        let mut messages: Vec<Message> = vec!();
+        let mut messages: Vec<Message> = vec![];
 
         for animated_corpse in self.animated_corpses.iter_mut() {
             if let Some(animated_corpse_messages) = animated_corpse.apply_event() {
@@ -31,13 +31,17 @@ impl Zone {
         }
 
         self.animated_corpses.push(Box::new(Rabbit::new(0, 0)));
-        println!("react event (animated_corpse: {})", self.animated_corpses.len());
+        println!(
+            "react event (animated_corpse: {})",
+            self.animated_corpses.len()
+        );
+        messages.push(Message::HelloWorldZone);
 
         messages
     }
 
     pub fn animate(&mut self) -> Vec<Message> {
-        let mut messages: Vec<Message> = vec!();
+        let mut messages: Vec<Message> = vec![];
 
         for animated_corpse in self.animated_corpses.iter_mut() {
             if let Some(animated_corpse_messages) = animated_corpse.animate() {
