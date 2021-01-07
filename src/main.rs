@@ -3,7 +3,6 @@ use async_std::pin::Pin;
 use async_std::sync::Mutex;
 use async_std::task;
 use futures::future::join_all;
-use std::cell::RefCell;
 use std::time::Duration;
 
 use crate::ac::AnimatedCorpse;
@@ -14,14 +13,14 @@ mod ac;
 mod message;
 mod zone;
 
-async fn on_events(zones: &Mutex<RefCell<Vec<Zone>>>, channel_sender: &Sender<Message>) {
+async fn on_events(zones: &Mutex<Vec<Zone>>, channel_sender: &Sender<Message>) {
     loop {
         // Simulate websocket events
         task::sleep(Duration::from_secs(2)).await;
         let mut messages: Vec<Message> = vec![];
 
         {
-            for zone in zones.lock().await.borrow_mut().iter_mut() {
+            for zone in zones.lock().await.iter_mut() {
                 messages.extend(zone.react());
             }
         }
@@ -34,13 +33,13 @@ async fn on_events(zones: &Mutex<RefCell<Vec<Zone>>>, channel_sender: &Sender<Me
     }
 }
 
-async fn animate(zones: &Mutex<RefCell<Vec<Zone>>>, channel_sender: &Sender<Message>) {
+async fn animate(zones: &Mutex<Vec<Zone>>, channel_sender: &Sender<Message>) {
     loop {
         task::sleep(Duration::from_secs(1)).await; // TODO calculate to have 1 fps
         let mut messages: Vec<Message> = vec![];
 
         {
-            for zone in zones.lock().await.borrow_mut().iter_mut() {
+            for zone in zones.lock().await.iter_mut() {
                 messages.extend(zone.animate())
             }
         };
@@ -80,7 +79,7 @@ async fn daemon(mut animated_corpses: Vec<Box<dyn AnimatedCorpse + Send + Sync>>
         zones.push(zone);
     }
 
-    let zones: Mutex<RefCell<Vec<Zone>>> = Mutex::new(RefCell::new(zones));
+    let zones: Mutex<Vec<Zone>> = Mutex::new(zones);
     let mut futures: Vec<Pin<Box<dyn futures::Future<Output = ()> + std::marker::Send>>> = vec![];
 
     futures.push(Box::pin(on_events(&zones, &channel_sender)));

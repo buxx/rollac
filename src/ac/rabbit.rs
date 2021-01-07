@@ -1,35 +1,27 @@
-use crate::ac::{AnimatedCorpse, Type};
+use crate::ac::{AnimatedCorpse, Type, Base};
 use crate::message::Message;
 
 pub struct Rabbit {
-    type_: Type,
-    world_row_i: u32,
-    world_col_i: u32,
+    base: Base,
     counter: i64,
 }
 
 impl Rabbit {
     pub fn new(world_row_i: u32, world_col_i: u32) -> Self {
         Rabbit {
-            type_: Type::Rabbit,
-            world_row_i,
-            world_col_i,
+            base: Base {
+                type_: Type::Rabbit,
+                world_row_i,
+                world_col_i
+            },
             counter: 0,
         }
     }
 }
 
 impl AnimatedCorpse for Rabbit {
-    fn get_type(&self) -> Type {
-        self.type_
-    }
-
-    fn get_world_row_i(&self) -> u32 {
-        self.world_row_i
-    }
-
-    fn get_world_col_i(&self) -> u32 {
-        self.world_col_i
+    fn base(&self) -> &Base {
+        &self.base
     }
 
     fn apply_event(&mut self) -> Option<Vec<Message>> {
