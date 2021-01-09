@@ -6,6 +6,10 @@ edition = "2018"
 
 [dependencies]
 futures = "0.3.8"
+websocket = "0.26.2"
+serde = "1.0.117"
+serde_derive = "1.0.117"
+serde_json = "1.0.59"
 
 [dependencies.async-std]
 version = "1.8.0"
