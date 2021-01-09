@@ -10,18 +10,22 @@ use crate::message::Message;
 use crate::zone::Zone;
 
 mod ac;
+mod event;
 mod message;
+mod socket;
 mod zone;
 
-async fn on_events(zones: &Mutex<Vec<Zone>>, channel_sender: &Sender<Message>) {
-    loop {
-        // Simulate websocket events
-        task::sleep(Duration::from_secs(2)).await;
+async fn on_events(
+    zones: &Mutex<Vec<Zone>>,
+    channel_sender: &Sender<Message>,
+    socket: &socket::Channel,
+) {
+    while let Ok(event) = socket.from_websocket_receiver.recv().await {
         let mut messages: Vec<Message> = vec![];
 
         {
             for zone in zones.lock().await.iter_mut() {
-                messages.extend(zone.react());
+                messages.extend(zone.react(&event));
             }
         }
 
@@ -52,14 +56,20 @@ async fn animate(zones: &Mutex<Vec<Zone>>, channel_sender: &Sender<Message>) {
     }
 }
 
-async fn on_messages(channel_receiver: Receiver<Message>) {
+async fn on_messages(channel_receiver: Receiver<Message>, socket: &socket::Channel) {
     while let Ok(message) = channel_receiver.recv().await {
         match message {
-            Message::HelloWorldZone => {
-                println!("HelloWorldZone")
-            }
-            Message::HelloWorldAnimatedCorpse => {
-                println!("HelloWorldAnimatedCorpse")
+            Message::RequireMove(zone_row_i, zone_col_i) => {
+                socket
+                    .send(event::ZoneEvent {
+                        event_type_name: String::from(event::ANIMATED_CORPSE_MOVE),
+                        event_type: event::ZoneEventType::AnimatedCorpseMove {
+                            to_row_i: zone_row_i,
+                            to_col_i: zone_col_i,
+                            animated_corpse_id: 42,
+                        },
+                    })
+                    .await;
             }
         }
     }
@@ -70,6 +80,8 @@ async fn on_messages(channel_receiver: Receiver<Message>) {
 
 async fn daemon(mut animated_corpses: Vec<Box<dyn AnimatedCorpse + Send + Sync>>) {
     let (channel_sender, channel_receiver) = unbounded();
+    let mut socket = socket::Channel::new("ws://echo.websocket.org".to_string());
+    socket.connect();
     let mut zones: Vec<Zone> = vec![];
 
     // fake here by adding all animated_corpse in same zone
@@ -82,9 +94,9 @@ async fn daemon(mut animated_corpses: Vec<Box<dyn AnimatedCorpse + Send + Sync>>
     let zones: Mutex<Vec<Zone>> = Mutex::new(zones);
     let mut futures: Vec<Pin<Box<dyn futures::Future<Output = ()> + std::marker::Send>>> = vec![];
 
-    futures.push(Box::pin(on_events(&zones, &channel_sender)));
+    futures.push(Box::pin(on_events(&zones, &channel_sender, &socket)));
     futures.push(Box::pin(animate(&zones, &channel_sender)));
-    futures.push(Box::pin(on_messages(channel_receiver)));
+    futures.push(Box::pin(on_messages(channel_receiver, &socket)));
 
     join_all(futures).await;
 }

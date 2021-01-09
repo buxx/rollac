@@ -1,4 +1,5 @@
-use crate::ac::{AnimatedCorpse, Type, Base};
+use crate::ac::{AnimatedCorpse, Base, Type};
+use crate::event::ZoneEvent;
 use crate::message::Message;
 
 pub struct Rabbit {
@@ -12,7 +13,7 @@ impl Rabbit {
             base: Base {
                 type_: Type::Rabbit,
                 world_row_i,
-                world_col_i
+                world_col_i,
             },
             counter: 0,
         }
@@ -24,14 +25,13 @@ impl AnimatedCorpse for Rabbit {
         &self.base
     }
 
-    fn apply_event(&mut self) -> Option<Vec<Message>> {
+    fn apply_event(&mut self, event: &ZoneEvent) -> Option<Vec<Message>> {
         self.counter += 1;
-        Some(vec![Message::HelloWorldAnimatedCorpse])
+        None
     }
 
     fn animate(&mut self) -> Option<Vec<Message>> {
         self.counter += 1;
-        println!("animate ({})", self.counter);
-        Some(vec![Message::HelloWorldAnimatedCorpse])
+        Some(vec![Message::RequireMove(1, 2)])
     }
 }

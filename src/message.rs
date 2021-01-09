@@ -1,5 +1,4 @@
 #[derive(Debug, Clone, Copy)]
 pub enum Message {
-    HelloWorldZone,
-    HelloWorldAnimatedCorpse,
+    RequireMove(u32, u32),
 }

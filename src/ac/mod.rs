@@ -1,3 +1,4 @@
+use crate::event::ZoneEvent;
 use crate::message::Message;
 
 pub mod rabbit;
@@ -24,6 +25,6 @@ pub trait AnimatedCorpse {
     fn get_world_col_i(&self) -> u32 {
         self.base().world_col_i
     }
-    fn apply_event(&mut self) -> Option<Vec<Message>>;
+    fn apply_event(&mut self, event: &ZoneEvent) -> Option<Vec<Message>>;
     fn animate(&mut self) -> Option<Vec<Message>>;
 }
