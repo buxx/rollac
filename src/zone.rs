@@ -1,11 +1,23 @@
-use crate::ac;
-use crate::ac::rabbit::Rabbit;
-use crate::message::Message;
+use crate::event::ZoneEvent;
+use crate::message::{AnimatedCorpseMessage, Message};
+use crate::tile::zone::{ZoneTiles, NOTHING};
+use crate::tile::TileId;
+use crate::{ac, util};
+
+#[derive(Debug)]
+pub struct LevelRow {
+    pub cols: Vec<String>,
+}
 
 pub struct Zone {
-    world_row_i: u32,
-    world_col_i: u32,
-    animated_corpses: Vec<Box<dyn ac::AnimatedCorpse + Send + Sync>>,
+    pub world_row_i: u32,
+    pub world_col_i: u32,
+    pub animated_corpses: Vec<Box<dyn ac::AnimatedCorpse + Send + Sync>>,
+    pub width: i32,
+    pub height: i32,
+    pub rows: Vec<LevelRow>,
+    pub world_tile_type_id: TileId,
+    pub tiles: ZoneTiles,
 }
 
 impl Zone {
@@ -13,42 +25,128 @@ impl Zone {
         world_row_i: u32,
         world_col_i: u32,
         animated_corpses: Vec<Box<dyn ac::AnimatedCorpse + Send + Sync>>,
-    ) -> Self {
-        Zone {
+        zone_raw: &str,
+        tiles: ZoneTiles,
+        world_tile_type_id: String,
+    ) -> Result<Self, String> {
+        let height = zone_raw.lines().count() as i32;
+        let longest_line = util::longest_line(zone_raw);
+        if !longest_line.is_some() {
+            return Err("There is no line in given zone source".to_string());
+        }
+
+        let width = longest_line.unwrap().chars().count() as i32;
+        let mut rows: Vec<LevelRow> = Vec::new();
+
+        for line in zone_raw.lines() {
+            let mut cols: Vec<String> = Vec::new();
+
+            for tile_char in line.chars() {
+                let tile_id = tiles.tile_id(tile_char as u16);
+                cols.push(tile_id);
+            }
+
+            let level_row = LevelRow { cols };
+            rows.push(level_row);
+        }
+
+        Ok(Zone {
             world_row_i,
             world_col_i,
             animated_corpses,
-        }
+            width,
+            height,
+            rows,
+            world_tile_type_id,
+            tiles,
+        })
     }
 
-    pub fn react(&mut self) -> Vec<Message> {
+    pub fn on_event(&mut self, event: &ZoneEvent) -> Vec<Message> {
         let mut messages: Vec<Message> = vec![];
+        // TODO: ici manage pop d'un nouveau ac; + task::spawn
 
-        for animated_corpse in self.animated_corpses.iter_mut() {
-            if let Some(animated_corpse_messages) = animated_corpse.apply_event() {
-                messages.extend(animated_corpse_messages);
-            }
-        }
-
-        self.animated_corpses.push(Box::new(Rabbit::new(0, 0)));
-        println!(
-            "react event (animated_corpse: {})",
-            self.animated_corpses.len()
-        );
-        messages.push(Message::HelloWorldZone);
-
-        messages
-    }
-
-    pub fn animate(&mut self) -> Vec<Message> {
-        let mut messages: Vec<Message> = vec![];
-
-        for animated_corpse in self.animated_corpses.iter_mut() {
-            if let Some(animated_corpse_messages) = animated_corpse.animate() {
+        for animated_corpse in self.animated_corpses.iter() {
+            if let Some(animated_corpse_messages) = animated_corpse.on_event(event, self) {
                 messages.extend(animated_corpse_messages);
             }
         }
 
         messages
+    }
+
+    pub fn animate(&self) -> Vec<Message> {
+        let mut messages: Vec<Message> = vec![];
+
+        for animated_corpse in self.animated_corpses.iter() {
+            if let Some(animated_corpse_messages) = animated_corpse.animate(self) {
+                messages.extend(animated_corpse_messages);
+            }
+        }
+
+        messages
+    }
+
+    pub fn on_message(&mut self, message: AnimatedCorpseMessage) {
+        for animated_corpse in self.animated_corpses.iter_mut() {
+            match message {
+                AnimatedCorpseMessage::UpdateZonePosition(
+                    base,
+                    zone_row_id,
+                    zone_col_id,
+                ) => {
+                    if animated_corpse.id() == base.id {
+                        animated_corpse.set_zone_row_i(zone_row_id);
+                        animated_corpse.set_zone_col_i(zone_col_id);
+                    }
+                } // Other message (not yet) can be passed to animated corpses
+            }
+        }
+    }
+
+    pub fn tile_id(&self, row_i: u32, col_i: u32) -> TileId {
+        if row_i >= self.rows.len() as u32 {
+            return String::from(NOTHING);
+        }
+
+        let row = &self.rows[row_i as usize];
+
+        if col_i >= row.cols.len() as u32 {
+            return String::from(NOTHING);
+        }
+
+        row.cols[col_i as usize].clone()
+    }
+
+    pub fn get_successors(&self, row_i: u32, col_i: u32) -> Vec<((u32, u32), u32)> {
+        let mut successors = vec![];
+        let row_i = row_i as i32;
+        let col_i = col_i as i32;
+
+        for (modifier_row_i, modifier_col_i) in [
+            (-1, -1),
+            (-1, 0),
+            (-1, 1),
+            (0, -1),
+            // no center pos
+            (0, 1),
+            (1, 1),
+            (1, -1),
+            (1, 0),
+        ]
+        .iter()
+        {
+            let new_row_i = row_i + *modifier_row_i;
+            let new_col_i = col_i + *modifier_col_i;
+
+            // Ignore outside coordinates
+            if new_row_i >= 0 && new_col_i >= 0 {
+                if self.tiles.browseable(&self.tile_id(new_row_i as u32, new_col_i as u32)) {
+                    successors.push(((new_row_i as u32, new_col_i as u32), 1));
+                }
+            }
+        }
+
+        successors
     }
 }
