@@ -14,6 +14,7 @@ mod event;
 mod message;
 mod socket;
 mod zone;
+mod client;
 
 async fn on_events(
     zones: &Mutex<Vec<Zone>>,
