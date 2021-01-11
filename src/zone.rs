@@ -1,5 +1,5 @@
 use crate::ac;
-use crate::ac::rabbit::Rabbit;
+use crate::ac::hare::Hare;
 use crate::event::ZoneEvent;
 use crate::message::Message;
 
@@ -26,18 +26,12 @@ impl Zone {
         let mut messages: Vec<Message> = vec![];
 
         // TODO: ici manage pop d'un nouveau ac; + task::spawn
-
+        println!("event recu: {:?}", event);
         for animated_corpse in self.animated_corpses.iter_mut() {
             if let Some(animated_corpse_messages) = animated_corpse.apply_event(event) {
                 messages.extend(animated_corpse_messages);
             }
         }
-
-        self.animated_corpses.push(Box::new(Rabbit::new(0, 0)));
-        println!(
-            "react event (animated_corpse: {})",
-            self.animated_corpses.len()
-        );
 
         messages
     }

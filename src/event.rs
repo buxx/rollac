@@ -30,16 +30,22 @@ pub enum ZoneEventType {
 pub struct ZoneEvent {
     pub event_type: ZoneEventType,
     pub event_type_name: String,
+    pub world_row_i: u32,
+    pub world_col_i: u32,
 }
 
 impl ZoneEvent {
     // TODO: by hand for now ... how to do automatic ?
     pub fn from_value(value: Value) -> Result<Self, String> {
         let type_ = value["type"].as_str().unwrap();
+        let world_row_i = value["world_row_i"].as_i64().unwrap() as u32;
+        let world_col_i = value["world_col_i"].as_i64().unwrap() as u32;
         let data = value.get("data").unwrap();
 
         match &type_ {
             &PLAYER_MOVE => Ok(ZoneEvent {
+                world_row_i,
+                world_col_i,
                 event_type_name: String::from(PLAYER_MOVE),
                 event_type: ZoneEventType::PlayerMove {
                     to_row_i: data["to_row_i"].as_i64().unwrap() as u32,
@@ -48,6 +54,8 @@ impl ZoneEvent {
                 },
             }),
             &ANIMATED_CORPSE_MOVE => Ok(ZoneEvent {
+                world_row_i,
+                world_col_i,
                 event_type_name: String::from(ANIMATED_CORPSE_MOVE),
                 event_type: ZoneEventType::AnimatedCorpseMove {
                     to_row_i: data["to_row_i"].as_i64().unwrap() as u32,
@@ -56,10 +64,14 @@ impl ZoneEvent {
                 },
             }),
             &CLIENT_WANT_CLOSE => Ok(ZoneEvent {
+                world_row_i,
+                world_col_i,
                 event_type_name: String::from(CLIENT_WANT_CLOSE),
                 event_type: ZoneEventType::ClientWantClose,
             }),
             &SERVER_PERMIT_CLOSE => Ok(ZoneEvent {
+                world_row_i,
+                world_col_i,
                 event_type_name: String::from(SERVER_PERMIT_CLOSE),
                 event_type: ZoneEventType::ServerPermitClose,
             }),
@@ -75,6 +87,8 @@ impl Serialize for ZoneEvent {
     {
         let mut state = serializer.serialize_struct("ZoneEvent", 2)?;
         state.serialize_field("type", &self.event_type_name)?;
+        state.serialize_field("world_row_i", &self.world_row_i)?;
+        state.serialize_field("world_col_i", &self.world_col_i)?;
         state.serialize_field("data", &self.event_type)?;
         state.end()
     }

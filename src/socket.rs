@@ -127,7 +127,7 @@ impl Channel {
 
                     if let event::ZoneEventType::ClientWantClose = received.event_type {
                         // Get out for loop (and finish thread)
-                        println!("Web socker writer is closing ...");
+                        println!("Web socket writer is closing ...");
                         break;
                     }
                 }
@@ -148,12 +148,15 @@ impl Channel {
         }
     }
 
-    pub fn close(&mut self) -> Result<(), Error> {
+    pub async fn close(&mut self) -> Result<(), Error> {
         self.closing = true;
         self.send(event::ZoneEvent {
             event_type: event::ZoneEventType::ClientWantClose,
             event_type_name: String::from(event::CLIENT_WANT_CLOSE),
-        });
+            world_row_i: 0,
+            world_col_i: 0,
+        })
+        .await;
 
         let start = SystemTime::now();
         let timeout = Duration::from_secs(5);

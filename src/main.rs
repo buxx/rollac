@@ -10,11 +10,11 @@ use crate::message::Message;
 use crate::zone::Zone;
 
 mod ac;
+mod client;
 mod event;
 mod message;
 mod socket;
 mod zone;
-mod client;
 
 async fn on_events(
     zones: &Mutex<Vec<Zone>>,
@@ -60,15 +60,18 @@ async fn animate(zones: &Mutex<Vec<Zone>>, channel_sender: &Sender<Message>) {
 async fn on_messages(channel_receiver: Receiver<Message>, socket: &socket::Channel) {
     while let Ok(message) = channel_receiver.recv().await {
         match message {
-            Message::RequireMove(zone_row_i, zone_col_i) => {
+            Message::RequireMove(animated_corpse_info, zone_row_i, zone_col_i) => {
+                let (animated_corpse_id, world_row_i, world_col_i) = animated_corpse_info;
                 socket
                     .send(event::ZoneEvent {
                         event_type_name: String::from(event::ANIMATED_CORPSE_MOVE),
                         event_type: event::ZoneEventType::AnimatedCorpseMove {
                             to_row_i: zone_row_i,
                             to_col_i: zone_col_i,
-                            animated_corpse_id: 42,
+                            animated_corpse_id,
                         },
+                        world_row_i,
+                        world_col_i,
                     })
                     .await;
             }
@@ -81,7 +84,7 @@ async fn on_messages(channel_receiver: Receiver<Message>, socket: &socket::Chann
 
 async fn daemon(mut animated_corpses: Vec<Box<dyn AnimatedCorpse + Send + Sync>>) {
     let (channel_sender, channel_receiver) = unbounded();
-    let mut socket = socket::Channel::new("ws://echo.websocket.org".to_string());
+    let mut socket = socket::Channel::new("http://127.0.0.1:5000/world/events".to_string());
     socket.connect();
     let mut zones: Vec<Zone> = vec![];
 
@@ -103,10 +106,10 @@ async fn daemon(mut animated_corpses: Vec<Box<dyn AnimatedCorpse + Send + Sync>>
 }
 
 fn main() {
-    let mut animated_corpses: Vec<Box<dyn AnimatedCorpse + Send + Sync>> = vec![];
-    for i in 0..2 {
-        animated_corpses.push(Box::new(ac::rabbit::Rabbit::new(0, i)));
-    }
+    let client = client::Client::new("127.0.0.1", 5000);
+    let animated_corpses: Vec<Box<dyn AnimatedCorpse + Send + Sync>> =
+        client.get_animated_corpses().unwrap();
+    println!("Found {} animated corpses", animated_corpses.len());
 
     task::block_on(daemon(animated_corpses))
 }
