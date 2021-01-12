@@ -21,11 +21,14 @@ impl AnimatedCorpse for Hare {
 
     fn apply_event(&mut self, event: &ZoneEvent) -> Option<Vec<Message>> {
         match event.event_type {
-            ZoneEventType::AnimatedCorpseMove { to_row_i, to_col_i, animated_corpse_id } => {
+            ZoneEventType::AnimatedCorpseMove {
+                to_row_i,
+                to_col_i,
+                animated_corpse_id,
+            } => {
                 if animated_corpse_id != self.base.id {
-                    return None
+                    return None; // We don't care this event for now if it is not for itself
                 }
-                println!("move");
                 self.base.zone_row_i = to_row_i;
                 self.base.zone_col_i = to_col_i;
             }
@@ -36,6 +39,7 @@ impl AnimatedCorpse for Hare {
     }
 
     fn animate(&mut self) -> Option<Vec<Message>> {
+        println!("animate");
         let new_zone_row_i = self.base.zone_row_i + 1;
         Some(vec![Message::RequireMove(
             (self.id(), self.world_row_i(), self.world_col_i()),

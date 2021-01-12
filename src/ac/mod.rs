@@ -22,7 +22,7 @@ pub fn animated_corpse_from_value(
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Base {
     id: u32,
     type_: Type,

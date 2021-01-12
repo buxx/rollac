@@ -6,7 +6,7 @@ use crate::message::Message;
 pub struct Zone {
     world_row_i: u32,
     world_col_i: u32,
-    animated_corpses: Vec<Box<dyn ac::AnimatedCorpse + Send + Sync>>,
+    pub animated_corpses: Vec<Box<dyn ac::AnimatedCorpse + Send + Sync>>,
 }
 
 impl Zone {
@@ -26,7 +26,6 @@ impl Zone {
         let mut messages: Vec<Message> = vec![];
 
         // TODO: ici manage pop d'un nouveau ac; + task::spawn
-        println!("event recu: {:?}", event);
         for animated_corpse in self.animated_corpses.iter_mut() {
             if let Some(animated_corpse_messages) = animated_corpse.apply_event(event) {
                 messages.extend(animated_corpse_messages);

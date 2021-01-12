@@ -8,6 +8,7 @@ use std::time::Duration;
 use crate::ac::AnimatedCorpse;
 use crate::message::Message;
 use crate::zone::Zone;
+use std::ops::Deref;
 
 mod ac;
 mod client;
@@ -82,18 +83,47 @@ async fn on_messages(channel_receiver: Receiver<Message>, socket: &socket::Chann
     panic!("Channel is closed !");
 }
 
-async fn daemon(mut animated_corpses: Vec<Box<dyn AnimatedCorpse + Send + Sync>>) {
+async fn daemon() {
+    // Prepare required variables
+    let mut zones: Vec<Zone> = vec![];
+    let client = client::Client::new("127.0.0.1", 5000);
     let (channel_sender, channel_receiver) = unbounded();
+
+    // Connect to world socket
     let mut socket = socket::Channel::new("http://127.0.0.1:5000/world/events".to_string());
     socket.connect();
-    let mut zones: Vec<Zone> = vec![];
 
-    // fake here by adding all animated_corpse in same zone
-    for i in 0..animated_corpses.len() {
-        let animated_corpse = animated_corpses.pop().unwrap();
-        let zone = Zone::new(0, i as u32, vec![animated_corpse]);
-        zones.push(zone);
+    // Grab world information
+    let world_source = client
+        .get_world_source()
+        .expect("Error when grab world source");
+
+    // Create zones and place animated corpses
+    let mut found_animated_corpses = 0;
+    for (world_row_i, row) in world_source.lines().enumerate() {
+        for (world_col_i, tile_type_as_char) in row.chars().enumerate() {
+            let zone_animated_corpses: Vec<Box<dyn AnimatedCorpse + Send + Sync>> = client
+                .get_animated_corpses(world_row_i as u32, world_col_i as u32)
+                .expect("Error during grab of animated corpses");
+            println!(
+                "Found {} animated corpses for zone {}.{}",
+                zone_animated_corpses.len(),
+                world_row_i,
+                world_col_i
+            );
+            found_animated_corpses += zone_animated_corpses.len();
+            let mut zone = Zone::new(
+                world_row_i as u32,
+                world_col_i as u32,
+                zone_animated_corpses,
+            );
+            zones.push(zone);
+        }
     }
+    println!(
+        "Total of animated corpses found: {}",
+        found_animated_corpses
+    );
 
     let zones: Mutex<Vec<Zone>> = Mutex::new(zones);
     let mut futures: Vec<Pin<Box<dyn futures::Future<Output = ()> + std::marker::Send>>> = vec![];
@@ -106,10 +136,5 @@ async fn daemon(mut animated_corpses: Vec<Box<dyn AnimatedCorpse + Send + Sync>>
 }
 
 fn main() {
-    let client = client::Client::new("127.0.0.1", 5000);
-    let animated_corpses: Vec<Box<dyn AnimatedCorpse + Send + Sync>> =
-        client.get_animated_corpses().unwrap();
-    println!("Found {} animated corpses", animated_corpses.len());
-
-    task::block_on(daemon(animated_corpses))
+    task::block_on(daemon())
 }

@@ -96,8 +96,15 @@ impl Client {
 
     pub fn get_animated_corpses(
         &self,
+        world_row_i: u32,
+        world_col_i: u32,
     ) -> Result<Vec<Box<dyn AnimatedCorpse + Send + Sync>>, ClientError> {
-        let url = format!("{}/ac/", self.get_base_path(),);
+        let url = format!(
+            "{}/ac/?world_row_i={}&world_col_i={}",
+            self.get_base_path(),
+            world_row_i,
+            world_col_i
+        );
         let response: Response =
             self.check_response(self.client.get(url.as_str()).send().unwrap())?;
 
@@ -114,5 +121,13 @@ impl Client {
             }
         }
         Ok(animated_corpses)
+    }
+
+    pub fn get_world_source(&self) -> Result<String, ClientError> {
+        let url = format!("{}/world/source", self.get_base_path(),);
+        let response: Response =
+            self.check_response(self.client.get(url.as_str()).send().unwrap())?;
+
+        Ok(response.text().unwrap())
     }
 }
