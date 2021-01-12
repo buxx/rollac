@@ -130,4 +130,32 @@ impl Client {
 
         Ok(response.text().unwrap())
     }
+
+    pub fn get_zone_data(&self, world_row_i: u32, world_col_i: u32) -> Result<Value, String> {
+        let url = format!(
+            "{}/zones/{}/{}",
+            self.get_base_path(),
+            world_row_i,
+            world_col_i
+        );
+        let response: Response =
+            match self.check_response(self.client.get(url.as_str()).send().unwrap()) {
+                Ok(response) => response,
+                Err(client_error) => return Err(ClientError::get_message(&client_error)),
+            };
+
+        Ok(response.json::<Value>().unwrap())
+    }
+
+    pub fn get_tiles_data(&self) -> Result<Value, String> {
+        println!("Retrieve tiles from server");
+        let url = format!("{}/zones/tiles", self.get_base_path());
+        let response: Response =
+            match self.check_response(self.client.get(url.as_str()).send().unwrap()) {
+                Ok(response) => response,
+                Err(client_error) => return Err(ClientError::get_message(&client_error)),
+            };
+
+        Ok(response.json::<Value>().unwrap())
+    }
 }
