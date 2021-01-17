@@ -24,7 +24,7 @@ impl Behavior for Fear {
         &self,
         animated_corpse: &Box<dyn AnimatedCorpse + Send + Sync>,
         event: &ZoneEvent,
-        _zone: &Zone,
+        zone: &Zone,
     ) -> Vec<Message> {
         let mut messages: Vec<Message> = vec![];
 
@@ -38,19 +38,35 @@ impl Behavior for Fear {
                     (animated_corpse.zone_row_i(), animated_corpse.zone_col_i()),
                     (*to_row_i, *to_col_i),
                 ) {
-                    println!("{:?}", direction);
                     let opposite_direction = util::opposite_direction(direction);
                     let opposite_modifier = util::direction_modifier(opposite_direction);
+                    let possible_moves: Vec<(u32, u32)> = zone
+                        .get_successors(animated_corpse.zone_row_i(), animated_corpse.zone_col_i())
+                        .iter()
+                        .map(|((to_row_i, to_col_i), weight)| (*to_row_i, *to_col_i))
+                        .collect();
+                    let mut escape_to_row_i = max(
+                        0,
+                        animated_corpse.zone_row_i() as i32 + opposite_modifier.0 as i32,
+                    ) as u32;
+                    let mut escape_to_col_i = max(
+                        0,
+                        animated_corpse.zone_col_i() as i32 + opposite_modifier.1 as i32,
+                    ) as u32;
+                    let escape_to = if possible_moves.contains(&(escape_to_row_i, escape_to_col_i))
+                    {
+                        (escape_to_row_i, escape_to_col_i)
+                    } else {
+                        *possible_moves.choose(&mut rand::thread_rng()).unwrap_or(&(
+                            animated_corpse.zone_row_i(),
+                            animated_corpse.zone_col_i(),
+                        ))
+                    };
+
                     messages.push(Message::Event(SendEventMessage::RequireMove(
                         animated_corpse.base().clone(),
-                        max(
-                            0,
-                            animated_corpse.zone_row_i() as i32 + opposite_modifier.0 as i32,
-                        ) as u32,
-                        max(
-                            0,
-                            animated_corpse.zone_col_i() as i32 + opposite_modifier.1 as i32,
-                        ) as u32,
+                        escape_to.0,
+                        escape_to.1,
                     )));
                 }
             }

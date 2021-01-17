@@ -3,7 +3,7 @@ use async_std::pin::Pin;
 use async_std::sync::Mutex;
 use async_std::task;
 use futures::future::join_all;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crate::ac::AnimatedCorpse;
 use crate::event::{ZoneEvent, ZoneEventType};
@@ -58,8 +58,15 @@ async fn on_events(
 
 async fn animate(zones: &Mutex<Vec<Zone>>, channel_sender: &Sender<Message>) {
     let mut tick_count: u64 = 0;
+    let mut last_tick = Instant::now();
     loop {
-        task::sleep(Duration::from_millis(TICK_EACH_MS)).await; // TODO calculate to have TICK_EACH_MS fps
+        let now = Instant::now();
+        let last_tick_duration = now - last_tick;
+        task::sleep(Duration::from_millis(
+            TICK_EACH_MS - last_tick_duration.as_millis() as u64,
+        ))
+        .await;
+        last_tick = Instant::now();
         let mut messages: Vec<Message> = vec![];
 
         {
