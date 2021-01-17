@@ -13,6 +13,7 @@ use crate::tile::zone::ZoneTiles;
 use crate::zone::Zone;
 
 mod ac;
+mod behavior;
 mod client;
 mod event;
 mod message;
@@ -21,6 +22,8 @@ mod tile;
 mod util;
 mod world;
 mod zone;
+
+const TICK_EACH_MS: u64 = 1000;
 
 async fn on_events(
     zones: &Mutex<Vec<Zone>>,
@@ -36,7 +39,9 @@ async fn on_events(
             // Event to give to animated corpses
             ZoneEventType::PlayerMove { .. } | ZoneEventType::AnimatedCorpseMove { .. } => {
                 for zone in zones.lock().await.iter_mut() {
-                    if event.world_row_i == zone.world_row_i && event.world_col_i ==zone.world_col_i {
+                    if event.world_row_i == zone.world_row_i
+                        && event.world_col_i == zone.world_col_i
+                    {
                         messages.extend(zone.on_event(&event));
                     }
                 }
@@ -52,13 +57,14 @@ async fn on_events(
 }
 
 async fn animate(zones: &Mutex<Vec<Zone>>, channel_sender: &Sender<Message>) {
+    let mut tick_count: u64 = 0;
     loop {
-        task::sleep(Duration::from_secs(1)).await; // TODO calculate to have 1 fps
+        task::sleep(Duration::from_millis(TICK_EACH_MS)).await; // TODO calculate to have TICK_EACH_MS fps
         let mut messages: Vec<Message> = vec![];
 
         {
             for zone in zones.lock().await.iter_mut() {
-                messages.extend(zone.animate())
+                messages.extend(zone.animate(tick_count))
             }
         };
 
@@ -67,6 +73,8 @@ async fn animate(zones: &Mutex<Vec<Zone>>, channel_sender: &Sender<Message>) {
                 panic!("Channel is closed !")
             };
         }
+
+        tick_count += 1;
     }
 }
 

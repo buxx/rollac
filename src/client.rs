@@ -3,9 +3,9 @@ use reqwest::blocking::Response;
 
 use crate::ac::{animated_corpse_from_value, AnimatedCorpse};
 use serde_derive::{Deserialize, Serialize};
-use serde_json::{Value};
+use serde_json::Value;
 use std::error::Error;
-use std::{fmt};
+use std::fmt;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ErrorResponse {

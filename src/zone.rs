@@ -1,8 +1,10 @@
+use crate::behavior::get_behaviors_for;
 use crate::event::ZoneEvent;
 use crate::message::{AnimatedCorpseMessage, Message};
 use crate::tile::zone::{ZoneTiles, NOTHING};
 use crate::tile::TileId;
 use crate::{ac, util};
+use async_std::stream::Extend;
 
 #[derive(Debug)]
 pub struct LevelRow {
@@ -67,20 +69,36 @@ impl Zone {
         // TODO: ici manage pop d'un nouveau ac; + task::spawn
 
         for animated_corpse in self.animated_corpses.iter() {
-            if let Some(animated_corpse_messages) = animated_corpse.on_event(event, self) {
-                messages.extend(animated_corpse_messages);
+            for message_ in animated_corpse.on_event(event, self) {
+                messages.push(message_);
+            }
+
+            for behavior in get_behaviors_for(animated_corpse).iter() {
+                for message_ in behavior.on_event(animated_corpse, event, self) {
+                    messages.push(message_);
+                }
             }
         }
 
         messages
     }
 
-    pub fn animate(&self) -> Vec<Message> {
+    pub fn animate(&self, tick_count: u64) -> Vec<Message> {
         let mut messages: Vec<Message> = vec![];
 
         for animated_corpse in self.animated_corpses.iter() {
-            if let Some(animated_corpse_messages) = animated_corpse.animate(self) {
-                messages.extend(animated_corpse_messages);
+            for message_ in animated_corpse.animate(self, tick_count) {
+                messages.push(message_)
+            }
+
+            for behavior in get_behaviors_for(animated_corpse).iter() {
+                if let Some(animate_each) = behavior.animate_each() {
+                    if tick_count % animate_each as u64 == 0 {
+                        for message_ in behavior.on_animate(animated_corpse, self) {
+                            messages.push(message_);
+                        }
+                    }
+                }
             }
         }
 
@@ -90,11 +108,7 @@ impl Zone {
     pub fn on_message(&mut self, message: AnimatedCorpseMessage) {
         for animated_corpse in self.animated_corpses.iter_mut() {
             match message {
-                AnimatedCorpseMessage::UpdateZonePosition(
-                    base,
-                    zone_row_id,
-                    zone_col_id,
-                ) => {
+                AnimatedCorpseMessage::UpdateZonePosition(base, zone_row_id, zone_col_id) => {
                     if animated_corpse.id() == base.id {
                         animated_corpse.set_zone_row_i(zone_row_id);
                         animated_corpse.set_zone_col_i(zone_col_id);
@@ -141,7 +155,10 @@ impl Zone {
 
             // Ignore outside coordinates
             if new_row_i >= 0 && new_col_i >= 0 {
-                if self.tiles.browseable(&self.tile_id(new_row_i as u32, new_col_i as u32)) {
+                if self
+                    .tiles
+                    .browseable(&self.tile_id(new_row_i as u32, new_col_i as u32))
+                {
                     successors.push(((new_row_i as u32, new_col_i as u32), 1));
                 }
             }

@@ -80,18 +80,16 @@ impl ZoneEvent {
 
     pub fn from_message(message: SendEventMessage) -> Self {
         match message {
-            SendEventMessage::RequireMove(base, zone_row_i, zone_col_i) => {
-                Self {
-                    event_type_name: String::from(ANIMATED_CORPSE_MOVE),
-                    event_type: ZoneEventType::AnimatedCorpseMove {
-                        to_row_i: zone_row_i,
-                        to_col_i: zone_col_i,
-                        animated_corpse_id: base.id,
-                    },
-                    world_row_i: base.world_row_i,
-                    world_col_i: base.world_col_i,
-                }
-            }
+            SendEventMessage::RequireMove(base, zone_row_i, zone_col_i) => Self {
+                event_type_name: String::from(ANIMATED_CORPSE_MOVE),
+                event_type: ZoneEventType::AnimatedCorpseMove {
+                    to_row_i: zone_row_i,
+                    to_col_i: zone_col_i,
+                    animated_corpse_id: base.id,
+                },
+                world_row_i: base.world_row_i,
+                world_col_i: base.world_col_i,
+            },
         }
     }
 }

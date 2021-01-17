@@ -1,7 +1,9 @@
 use crate::ac::hare::Hare;
-use crate::event::ZoneEvent;
+use crate::behavior::Behavior;
+use crate::event::{ZoneEvent, ZoneEventType};
 use crate::message::{AnimatedCorpseMessage, Message};
 use crate::zone::Zone;
+use async_std::stream::Extend;
 use serde_derive::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -66,7 +68,35 @@ pub trait AnimatedCorpse {
     fn set_zone_col_i(&mut self, zone_col_i: u32) {
         self.base_mut().zone_col_i = zone_col_i
     }
-    fn on_event(&self, event: &ZoneEvent, zone: &Zone) -> Option<Vec<Message>>;
+    fn on_event(&self, event: &ZoneEvent, zone: &Zone) -> Vec<Message> {
+        let mut messages: Vec<Message> = vec![];
+
+        match event.event_type {
+            ZoneEventType::AnimatedCorpseMove {
+                to_row_i,
+                to_col_i,
+                animated_corpse_id,
+            } => {
+                if animated_corpse_id == self.base().id {
+                    messages.push(Message::AnimatedCorpse(
+                        AnimatedCorpseMessage::UpdateZonePosition(
+                            self.base().clone(),
+                            to_row_i,
+                            to_col_i,
+                        ),
+                    ))
+                }
+            }
+            _ => {}
+        }
+
+        for message in self._on_event(event, zone) {
+            messages.push(message);
+        }
+
+        messages
+    }
+    fn _on_event(&self, event: &ZoneEvent, zone: &Zone) -> Vec<Message>;
     fn on_message(&mut self, message: AnimatedCorpseMessage);
-    fn animate(&self, zone: &Zone) -> Option<Vec<Message>>;
+    fn animate(&self, zone: &Zone, tick_count: u64) -> Vec<Message>;
 }
