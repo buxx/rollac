@@ -1,12 +1,17 @@
 use crate::message::SendEventMessage;
+use crate::model;
 use serde::ser::{Serialize, SerializeStruct, Serializer};
 use serde_derive::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::HashMap;
 
 pub const PLAYER_MOVE: &str = "PLAYER_MOVE";
 pub const ANIMATED_CORPSE_MOVE: &str = "ANIMATED_CORPSE_MOVE";
 pub const CLIENT_WANT_CLOSE: &str = "CLIENT_WANT_CLOSE";
 pub const SERVER_PERMIT_CLOSE: &str = "SERVER_PERMIT_CLOSE";
+pub const CHARACTER_ENTER_ZONE: &str = "CHARACTER_ENTER_ZONE";
+pub const CHARACTER_EXIT_ZONE: &str = "CHARACTER_EXIT_ZONE";
+pub const NEW_BUILD: &str = "NEW_BUILD";
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(untagged)]
@@ -22,6 +27,17 @@ pub enum ZoneEventType {
         to_row_i: u32,
         to_col_i: u32,
         animated_corpse_id: u32,
+    },
+    CharacterEnter {
+        zone_row_i: i32,
+        zone_col_i: i32,
+        character_id: String,
+    },
+    CharacterExit {
+        character_id: String,
+    },
+    NewBuild {
+        build: model::Build,
     },
 }
 
@@ -74,21 +90,72 @@ impl ZoneEvent {
                 event_type_name: String::from(SERVER_PERMIT_CLOSE),
                 event_type: ZoneEventType::ServerPermitClose,
             }),
+            &CHARACTER_ENTER_ZONE => Ok(ZoneEvent {
+                world_row_i,
+                world_col_i,
+                event_type_name: String::from(CHARACTER_ENTER_ZONE),
+                event_type: ZoneEventType::CharacterEnter {
+                    zone_row_i: data["zone_row_i"].as_i64().unwrap() as i32,
+                    zone_col_i: data["zone_col_i"].as_i64().unwrap() as i32,
+                    character_id: String::from(data["character_id"].as_str().unwrap()),
+                },
+            }),
+            &CHARACTER_EXIT_ZONE => Ok(ZoneEvent {
+                world_row_i,
+                world_col_i,
+                event_type_name: String::from(CHARACTER_EXIT_ZONE),
+                event_type: ZoneEventType::CharacterExit {
+                    character_id: String::from(data["character_id"].as_str().unwrap()),
+                },
+            }),
+            &NEW_BUILD => {
+                let build_data = data["build"].as_object().unwrap();
+                let mut traversable: HashMap<String, bool> = HashMap::new();
+                traversable.insert(
+                    "WALKING".to_string(),
+                    build_data["traversable"]
+                        .as_object()
+                        .unwrap()
+                        .get("WALKING")
+                        .unwrap()
+                        .as_bool()
+                        .unwrap(),
+                );
+
+                Ok(ZoneEvent {
+                    world_row_i,
+                    world_col_i,
+                    event_type_name: String::from(NEW_BUILD),
+                    event_type: ZoneEventType::NewBuild {
+                        build: model::Build {
+                            id: build_data["id"].as_i64().unwrap() as u32,
+                            build_id: build_data["build_id"].as_str().unwrap().to_string(),
+                            row_i: build_data["row_i"].as_i64().unwrap() as u32,
+                            col_i: build_data["col_i"].as_i64().unwrap() as u32,
+                            traversable,
+                        },
+                    },
+                })
+            }
             _ => Err(format!("Unknown event {}", &type_)),
         }
     }
 
     pub fn from_message(message: SendEventMessage) -> Self {
         match message {
-            SendEventMessage::RequireMove(base, zone_row_i, zone_col_i) => Self {
+            SendEventMessage::RequireMove(
+                (animated_corpse_id, world_row_i, world_col_i),
+                zone_row_i,
+                zone_col_i,
+            ) => Self {
                 event_type_name: String::from(ANIMATED_CORPSE_MOVE),
                 event_type: ZoneEventType::AnimatedCorpseMove {
                     to_row_i: zone_row_i,
                     to_col_i: zone_col_i,
-                    animated_corpse_id: base.id,
+                    animated_corpse_id,
                 },
-                world_row_i: base.world_row_i,
-                world_col_i: base.world_col_i,
+                world_row_i,
+                world_col_i,
             },
         }
     }

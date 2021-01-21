@@ -2,7 +2,7 @@ use crate::ac::{AnimatedCorpse, AnimatedCorpseBase};
 use crate::behavior::move_::Move;
 use crate::behavior::{move_, Behavior};
 use crate::event::{ZoneEvent, ZoneEventType};
-use crate::message::{AnimatedCorpseMessage, Message, SendEventMessage};
+use crate::message::{Message, SendEventMessage, ZoneMessage};
 use crate::zone::Zone;
 use async_std::stream::Extend;
 use serde_derive::{Deserialize, Serialize};
@@ -27,11 +27,11 @@ impl AnimatedCorpse for Hare {
         &mut self.base
     }
 
-    fn _on_event(&self, _event: &ZoneEvent, _zone: &Zone) -> Vec<Message> {
+    fn on_event(&self, _event: &ZoneEvent, _zone: &Zone) -> Vec<Message> {
         vec![]
     }
 
-    fn on_message(&mut self, _message: AnimatedCorpseMessage) {
+    fn on_message(&mut self, _message: ZoneMessage) {
         //
     }
 

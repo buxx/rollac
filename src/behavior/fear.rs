@@ -64,7 +64,11 @@ impl Behavior for Fear {
                     };
 
                     messages.push(Message::Event(SendEventMessage::RequireMove(
-                        animated_corpse.base().clone(),
+                        (
+                            animated_corpse.id(),
+                            animated_corpse.zone_row_i(),
+                            animated_corpse.zone_col_i(),
+                        ),
                         escape_to.0,
                         escape_to.1,
                     )));

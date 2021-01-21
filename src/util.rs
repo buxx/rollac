@@ -116,3 +116,11 @@ pub fn position_direction_from(reference: (u32, u32), position: (u32, u32)) -> O
         (_, _) => None,
     }
 }
+
+pub fn is_near(position1: (u32, u32), position2: (u32, u32), distance: u32) -> bool {
+    let row_distance = (position1.0 as i32 - position2.0 as i32).abs() as u32;
+    let col_distance = (position1.1 as i32 - position2.1 as i32).abs() as u32;
+    println!("{:?} {:?}", position1, position2);
+    println!("{} {}", row_distance, col_distance);
+    row_distance <= distance && col_distance <= distance
+}

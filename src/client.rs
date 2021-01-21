@@ -2,6 +2,7 @@ use reqwest;
 use reqwest::blocking::Response;
 
 use crate::ac::{animated_corpse_from_value, AnimatedCorpse};
+use crate::model;
 use serde_derive::{Deserialize, Serialize};
 use serde_json::Value;
 use std::error::Error;
@@ -113,6 +114,42 @@ impl Client {
             }
         }
         Ok(animated_corpses)
+    }
+
+    pub fn get_zone_characters(
+        &self,
+        world_row_i: u32,
+        world_col_i: u32,
+    ) -> Result<Vec<model::Character>, ClientError> {
+        println!("Retrieve characters from server");
+        let url = format!(
+            "{}/zones/{}/{}/characters",
+            self.get_base_path(),
+            world_row_i,
+            world_col_i
+        );
+        let response: Response =
+            self.check_response(self.client.get(url.as_str()).send().unwrap())?;
+
+        Ok(response.json::<Vec<model::Character>>().unwrap())
+    }
+
+    pub fn get_zone_builds(
+        &self,
+        world_row_i: u32,
+        world_col_i: u32,
+    ) -> Result<Vec<model::Build>, ClientError> {
+        println!("Retrieve builds from server");
+        let url = format!(
+            "{}/zones/{}/{}/builds",
+            self.get_base_path(),
+            world_row_i,
+            world_col_i
+        );
+        let response: Response =
+            self.check_response(self.client.get(url.as_str()).send().unwrap())?;
+
+        Ok(response.json::<Vec<model::Build>>().unwrap())
     }
 
     pub fn get_world_source(&self) -> Result<String, ClientError> {

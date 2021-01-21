@@ -1,9 +1,10 @@
 use crate::behavior::get_behaviors_for;
-use crate::event::ZoneEvent;
-use crate::message::{AnimatedCorpseMessage, Message};
+use crate::event::{ZoneEvent, ZoneEventType};
+use crate::message::{Message, ZoneMessage};
+use crate::model::Character;
 use crate::tile::zone::{ZoneTiles, NOTHING};
 use crate::tile::TileId;
-use crate::{ac, util};
+use crate::{ac, model, util};
 use async_std::stream::Extend;
 
 #[derive(Debug)]
@@ -15,6 +16,8 @@ pub struct Zone {
     pub world_row_i: u32,
     pub world_col_i: u32,
     pub animated_corpses: Vec<Box<dyn ac::AnimatedCorpse + Send + Sync>>,
+    pub characters: Vec<model::Character>,
+    pub builds: Vec<model::Build>,
     pub width: i32,
     pub height: i32,
     pub rows: Vec<LevelRow>,
@@ -27,6 +30,8 @@ impl Zone {
         world_row_i: u32,
         world_col_i: u32,
         animated_corpses: Vec<Box<dyn ac::AnimatedCorpse + Send + Sync>>,
+        characters: Vec<model::Character>,
+        builds: Vec<model::Build>,
         zone_raw: &str,
         tiles: ZoneTiles,
         world_tile_type_id: String,
@@ -56,6 +61,8 @@ impl Zone {
             world_row_i,
             world_col_i,
             animated_corpses,
+            characters,
+            builds,
             width,
             height,
             rows,
@@ -66,7 +73,6 @@ impl Zone {
 
     pub fn on_event(&mut self, event: &ZoneEvent) -> Vec<Message> {
         let mut messages: Vec<Message> = vec![];
-        // TODO: ici manage pop d'un nouveau ac; + task::spawn
 
         for animated_corpse in self.animated_corpses.iter() {
             for message_ in animated_corpse.on_event(event, self) {
@@ -105,15 +111,52 @@ impl Zone {
         messages
     }
 
-    pub fn on_message(&mut self, message: AnimatedCorpseMessage) {
-        for animated_corpse in self.animated_corpses.iter_mut() {
-            match message {
-                AnimatedCorpseMessage::UpdateZonePosition(base, zone_row_id, zone_col_id) => {
-                    if animated_corpse.id() == base.id {
-                        animated_corpse.set_zone_row_i(zone_row_id);
-                        animated_corpse.set_zone_col_i(zone_col_id);
+    pub fn on_message(&mut self, message: ZoneMessage) {
+        match message {
+            ZoneMessage::UpdateAnimatedCorpsePosition(_, _, _) => {
+                for animated_corpse in self.animated_corpses.iter_mut() {
+                    match message {
+                        ZoneMessage::UpdateAnimatedCorpsePosition(
+                            (animated_corpse_id, _, _),
+                            zone_row_id,
+                            zone_col_id,
+                        ) => {
+                            if animated_corpse.id() == animated_corpse_id {
+                                animated_corpse.set_zone_row_i(zone_row_id);
+                                animated_corpse.set_zone_col_i(zone_col_id);
+                            }
+                        }
+                        _ => {}
                     }
-                } // Other message (not yet) can be passed to animated corpses
+                }
+            }
+            ZoneMessage::UpdateCharacterPosition((character_id, _, _), to_row_i, to_col_i) => {
+                for character in self.characters.iter_mut() {
+                    if character.id == character_id {
+                        character.zone_row_i = to_row_i;
+                        character.zone_col_i = to_col_i;
+                    }
+                }
+            }
+            ZoneMessage::RemoveCharacter((character_id, _, _)) => {
+                if let Some(position_to_remove) = self
+                    .characters
+                    .iter()
+                    .position(|character| character.id == character_id)
+                {
+                    self.characters.remove(position_to_remove);
+                }
+            }
+            ZoneMessage::AddCharacter((character_id, row_i, col_i)) => {
+                // FIXME BS NOW: when move, this new character is not knew ...
+                self.characters.push(Character {
+                    id: character_id,
+                    zone_row_i: row_i,
+                    zone_col_i: col_i,
+                })
+            }
+            ZoneMessage::AddBuild(build) => {
+                self.builds.push(build);
             }
         }
     }

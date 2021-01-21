@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 
 use crate::ac::AnimatedCorpse;
 use crate::event::{ZoneEvent, ZoneEventType};
-use crate::message::Message;
+use crate::message::{Message, ZoneMessage};
 use crate::tile::world::WorldTiles;
 use crate::tile::zone::ZoneTiles;
 use crate::zone::Zone;
@@ -17,6 +17,7 @@ mod behavior;
 mod client;
 mod event;
 mod message;
+mod model;
 mod socket;
 mod tile;
 mod util;
@@ -33,18 +34,59 @@ async fn on_events(
     while let Ok(event) = socket.from_websocket_receiver.recv().await {
         let mut messages: Vec<Message> = vec![];
 
-        match event.event_type {
+        match &event.event_type {
             // Ignore internal mechanisms events
             ZoneEventType::ClientWantClose | ZoneEventType::ServerPermitClose => continue,
-            // Event to give to animated corpses
-            ZoneEventType::PlayerMove { .. } | ZoneEventType::AnimatedCorpseMove { .. } => {
-                for zone in zones.lock().await.iter_mut() {
-                    if event.world_row_i == zone.world_row_i
-                        && event.world_col_i == zone.world_col_i
-                    {
-                        messages.extend(zone.on_event(&event));
-                    }
-                }
+            // First convert some event to messages
+            ZoneEventType::PlayerMove {
+                to_row_i,
+                to_col_i,
+                character_id,
+            } => {
+                messages.push(Message::Zone(ZoneMessage::UpdateCharacterPosition(
+                    (character_id.clone(), event.world_row_i, event.world_col_i),
+                    *to_row_i,
+                    *to_col_i,
+                )));
+            }
+            ZoneEventType::AnimatedCorpseMove {
+                to_row_i,
+                to_col_i,
+                animated_corpse_id,
+            } => messages.push(Message::Zone(ZoneMessage::UpdateAnimatedCorpsePosition(
+                (*animated_corpse_id, event.world_row_i, event.world_col_i),
+                *to_row_i,
+                *to_col_i,
+            ))),
+            ZoneEventType::CharacterEnter {
+                zone_row_i,
+                zone_col_i,
+                character_id,
+            } => {
+                messages.push(Message::Zone(ZoneMessage::AddCharacter((
+                    character_id.clone(),
+                    event.world_row_i,
+                    event.world_col_i,
+                ))));
+                continue;
+            }
+            ZoneEventType::CharacterExit { character_id } => {
+                messages.push(Message::Zone(ZoneMessage::RemoveCharacter((
+                    character_id.clone(),
+                    event.world_row_i,
+                    event.world_col_i,
+                ))));
+                continue;
+            }
+            ZoneEventType::NewBuild { build } => {
+                messages.push(Message::Zone(ZoneMessage::AddBuild(build.clone())));
+                continue;
+            }
+        }
+
+        for zone in zones.lock().await.iter_mut() {
+            if event.world_row_i == zone.world_row_i && event.world_col_i == zone.world_col_i {
+                messages.extend(zone.on_event(&event));
             }
         }
 
@@ -97,9 +139,10 @@ async fn on_messages(
                     .send(ZoneEvent::from_message(send_event_message))
                     .await
             }
-            Message::AnimatedCorpse(animated_corpse_message) => {
+            Message::Zone(animated_corpse_message) => {
+                // FIXME BS: check zone match
                 for zone in zones.lock().await.iter_mut() {
-                    zone.on_message(animated_corpse_message)
+                    zone.on_message(animated_corpse_message.clone())
                 }
             }
         }
@@ -185,10 +228,19 @@ async fn daemon() {
             let zone_raw = zone_data["raw_source"].as_str().unwrap();
             let zone_raw = util::extract_block_from_source(util::BLOCK_GEO, zone_raw).unwrap();
 
+            let zone_characters = client
+                .get_zone_characters(world_row_i as u32, world_col_i as u32)
+                .unwrap();
+            let zone_builds = client
+                .get_zone_builds(world_row_i as u32, world_col_i as u32)
+                .unwrap();
+
             match Zone::new(
                 world_row_i as u32,
                 world_col_i as u32,
                 zone_animated_corpses,
+                zone_characters,
+                zone_builds,
                 &zone_raw,
                 zone_tiles,
                 world_tile_type_id,

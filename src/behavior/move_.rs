@@ -2,6 +2,7 @@ use crate::ac::{AnimatedCorpse, Type};
 use crate::behavior::Behavior;
 use crate::event::{ZoneEvent, ZoneEventType};
 use crate::message::{Message, SendEventMessage};
+use crate::util;
 use crate::zone::Zone;
 use rand::seq::SliceRandom;
 
@@ -20,7 +21,7 @@ impl Move {
 
 impl Behavior for Move {
     fn animate_each(&self) -> Option<u8> {
-        Some(5)
+        Some(1)
     }
 
     fn on_event(
@@ -58,11 +59,28 @@ impl Behavior for Move {
             .get_successors(animated_corpse.zone_row_i(), animated_corpse.zone_col_i())
             .choose(&mut rand::thread_rng())
         {
-            messages.push(Message::Event(SendEventMessage::RequireMove(
-                animated_corpse.base().clone(),
-                *move_to_row_i,
-                *move_to_col_i,
-            )));
+            let mut near_character = false;
+            for character in &zone.characters {
+                if util::is_near(
+                    (character.zone_row_i, character.zone_col_i),
+                    (*move_to_row_i, *move_to_col_i),
+                    1,
+                ) {
+                    near_character = true;
+                    break;
+                }
+            }
+            if !near_character {
+                messages.push(Message::Event(SendEventMessage::RequireMove(
+                    (
+                        animated_corpse.id(),
+                        animated_corpse.zone_row_i(),
+                        animated_corpse.zone_row_i(),
+                    ),
+                    *move_to_row_i,
+                    *move_to_col_i,
+                )));
+            }
         }
 
         messages
