@@ -34,8 +34,8 @@ impl Behavior for Move {
 
         match &event.event_type {
             ZoneEventType::AnimatedCorpseMove {
-                to_row_i,
-                to_col_i,
+                to_row_i: _,
+                to_col_i: _,
                 animated_corpse_id,
             } => {
                 if animated_corpse_id != &animated_corpse.base().id && self.move_in_pack {

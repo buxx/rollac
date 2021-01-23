@@ -1,4 +1,4 @@
-use crate::ac::{AnimatedCorpse, Type};
+use crate::ac::{AnimatedCorpse};
 use crate::behavior::Behavior;
 use crate::event::{ZoneEvent, ZoneEventType};
 use crate::message::{Message, SendEventMessage};
@@ -43,13 +43,13 @@ impl Behavior for Fear {
                     let possible_moves: Vec<(u32, u32)> = zone
                         .get_successors(animated_corpse.zone_row_i(), animated_corpse.zone_col_i())
                         .iter()
-                        .map(|((to_row_i, to_col_i), weight)| (*to_row_i, *to_col_i))
+                        .map(|((to_row_i, to_col_i), _weight)| (*to_row_i, *to_col_i))
                         .collect();
-                    let mut escape_to_row_i = max(
+                    let escape_to_row_i = max(
                         0,
                         animated_corpse.zone_row_i() as i32 + opposite_modifier.0 as i32,
                     ) as u32;
-                    let mut escape_to_col_i = max(
+                    let escape_to_col_i = max(
                         0,
                         animated_corpse.zone_col_i() as i32 + opposite_modifier.1 as i32,
                     ) as u32;

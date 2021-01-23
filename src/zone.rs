@@ -1,11 +1,10 @@
 use crate::behavior::get_behaviors_for;
-use crate::event::{ZoneEvent, ZoneEventType};
+use crate::event::{ZoneEvent};
 use crate::message::{Message, ZoneMessage};
 use crate::model::Character;
 use crate::tile::zone::{ZoneTiles, NOTHING};
 use crate::tile::TileId;
 use crate::{ac, model, util};
-use async_std::stream::Extend;
 
 #[derive(Debug)]
 pub struct LevelRow {

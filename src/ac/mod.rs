@@ -1,9 +1,7 @@
 use crate::ac::hare::Hare;
-use crate::behavior::Behavior;
-use crate::event::{ZoneEvent, ZoneEventType};
+use crate::event::{ZoneEvent};
 use crate::message::{Message, ZoneMessage};
 use crate::zone::Zone;
-use async_std::stream::Extend;
 use serde_derive::{Deserialize, Serialize};
 use serde_json::Value;
 

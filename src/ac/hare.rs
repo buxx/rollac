@@ -1,10 +1,7 @@
 use crate::ac::{AnimatedCorpse, AnimatedCorpseBase};
-use crate::behavior::move_::Move;
-use crate::behavior::{move_, Behavior};
-use crate::event::{ZoneEvent, ZoneEventType};
-use crate::message::{Message, SendEventMessage, ZoneMessage};
+use crate::event::{ZoneEvent};
+use crate::message::{Message, ZoneMessage};
 use crate::zone::Zone;
-use async_std::stream::Extend;
 use serde_derive::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -35,7 +32,7 @@ impl AnimatedCorpse for Hare {
         //
     }
 
-    fn animate(&self, zone: &Zone, tick_count: u64) -> Vec<Message> {
+    fn animate(&self, _zone: &Zone, _tick_count: u64) -> Vec<Message> {
         vec![]
     }
 }
