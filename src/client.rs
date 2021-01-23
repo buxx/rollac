@@ -121,7 +121,6 @@ impl Client {
         world_row_i: u32,
         world_col_i: u32,
     ) -> Result<Vec<model::Character>, ClientError> {
-        println!("Retrieve characters from server");
         let url = format!(
             "{}/zones/{}/{}/characters",
             self.get_base_path(),
@@ -139,7 +138,6 @@ impl Client {
         world_row_i: u32,
         world_col_i: u32,
     ) -> Result<Vec<model::Build>, ClientError> {
-        println!("Retrieve builds from server");
         let url = format!(
             "{}/zones/{}/{}/builds",
             self.get_base_path(),
@@ -177,7 +175,6 @@ impl Client {
     }
 
     pub fn get_tiles_data(&self) -> Result<Value, String> {
-        println!("Retrieve tiles from server");
         let url = format!("{}/zones/tiles", self.get_base_path());
         let response: Response =
             match self.check_response(self.client.get(url.as_str()).send().unwrap()) {

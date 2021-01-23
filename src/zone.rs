@@ -1,9 +1,12 @@
+use crate::ac::AnimatedCorpse;
 use crate::behavior::get_behaviors_for;
-use crate::event::{ZoneEvent};
+use crate::client::Client;
+use crate::event::ZoneEvent;
 use crate::message::{Message, ZoneMessage};
 use crate::model::Character;
 use crate::tile::zone::{ZoneTiles, NOTHING};
 use crate::tile::TileId;
+use crate::world::World;
 use crate::{ac, model, util};
 
 #[derive(Debug)]
@@ -207,4 +210,54 @@ impl Zone {
 
         successors
     }
+}
+
+pub fn new(
+    world: &World,
+    client: &Client,
+    world_row_i: u32,
+    world_col_i: u32,
+    animated_corpses: Vec<Box<dyn AnimatedCorpse + Send + Sync>>,
+) -> Zone {
+    let world_tile_type_id = world.rows[world_row_i as usize].cols[world_col_i as usize].clone();
+    let server_tiles_data = match client.get_tiles_data() {
+        Ok(server_tiles_data) => server_tiles_data,
+        Err(msg) => {
+            panic!(msg)
+        }
+    };
+    let zone_tiles = ZoneTiles::new(server_tiles_data);
+    let zone_data = match client.get_zone_data(world_row_i as u32, world_col_i as u32) {
+        Ok(zone_data) => zone_data,
+        Err(msg) => {
+            panic!(msg)
+        }
+    };
+    let zone_raw = zone_data["raw_source"].as_str().unwrap();
+    let zone_raw = util::extract_block_from_source(util::BLOCK_GEO, zone_raw).unwrap();
+
+    let zone_characters = client
+        .get_zone_characters(world_row_i as u32, world_col_i as u32)
+        .unwrap();
+    let zone_builds = client
+        .get_zone_builds(world_row_i as u32, world_col_i as u32)
+        .unwrap();
+
+    let zone = match Zone::new(
+        world_row_i as u32,
+        world_col_i as u32,
+        animated_corpses,
+        zone_characters,
+        zone_builds,
+        &zone_raw,
+        zone_tiles,
+        world_tile_type_id,
+    ) {
+        Ok(zone) => zone,
+        Err(msg) => {
+            panic!(msg)
+        }
+    };
+
+    zone
 }

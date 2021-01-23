@@ -1,9 +1,14 @@
-use crate::message::SendEventMessage;
-use crate::model;
+use std::collections::HashMap;
+
+use async_std::channel::Sender;
+use async_std::sync::Mutex;
 use serde::ser::{Serialize, SerializeStruct, Serializer};
 use serde_derive::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::HashMap;
+
+use crate::message::{Message, SendEventMessage, ZoneMessage};
+use crate::zone::Zone;
+use crate::{model, socket};
 
 pub const PLAYER_MOVE: &str = "PLAYER_MOVE";
 pub const ANIMATED_CORPSE_MOVE: &str = "ANIMATED_CORPSE_MOVE";
@@ -172,5 +177,83 @@ impl Serialize for ZoneEvent {
         state.serialize_field("world_col_i", &self.world_col_i)?;
         state.serialize_field("data", &self.event_type)?;
         state.end()
+    }
+}
+
+pub async fn on_events(
+    zones: &Mutex<Vec<Zone>>,
+    channel_sender: &Sender<Message>,
+    socket: &socket::Channel,
+) {
+    log::info!("Listening events");
+    while let Ok(event) = socket.from_websocket_receiver.recv().await {
+        log::debug!("Event received: {:?}", event);
+        let mut messages: Vec<Message> = vec![];
+
+        match &event.event_type {
+            // Ignore internal mechanisms events
+            ZoneEventType::ClientWantClose | ZoneEventType::ServerPermitClose => continue,
+            // First convert some event to messages
+            ZoneEventType::PlayerMove {
+                to_row_i,
+                to_col_i,
+                character_id,
+            } => {
+                messages.push(Message::Zone(
+                    ZoneMessage::UpdateCharacterPosition(
+                        character_id.clone(),
+                        *to_row_i,
+                        *to_col_i,
+                    ),
+                    (event.world_row_i, event.world_col_i),
+                ));
+            }
+            ZoneEventType::AnimatedCorpseMove {
+                to_row_i,
+                to_col_i,
+                animated_corpse_id,
+            } => messages.push(Message::Zone(
+                ZoneMessage::UpdateAnimatedCorpsePosition(
+                    *animated_corpse_id,
+                    *to_row_i,
+                    *to_col_i,
+                ),
+                (event.world_row_i, event.world_col_i),
+            )),
+            ZoneEventType::CharacterEnter {
+                zone_row_i,
+                zone_col_i,
+                character_id,
+            } => {
+                messages.push(Message::Zone(
+                    ZoneMessage::AddCharacter(character_id.clone(), *zone_row_i, *zone_col_i),
+                    (event.world_row_i, event.world_col_i),
+                ));
+            }
+            ZoneEventType::CharacterExit { character_id } => {
+                messages.push(Message::Zone(
+                    ZoneMessage::RemoveCharacter(character_id.clone()),
+                    (event.world_row_i, event.world_col_i),
+                ));
+            }
+            ZoneEventType::NewBuild { build } => {
+                messages.push(Message::Zone(
+                    ZoneMessage::AddBuild(build.clone()),
+                    (event.world_row_i, event.world_col_i),
+                ));
+            }
+        }
+
+        for zone in zones.lock().await.iter_mut() {
+            if event.world_row_i == zone.world_row_i && event.world_col_i == zone.world_col_i {
+                messages.extend(zone.on_event(&event));
+            }
+        }
+
+        for message in messages {
+            if let Err(_) = channel_sender.send(message).await {
+                panic!("Channel is closed !")
+            }
+        }
     }
 }

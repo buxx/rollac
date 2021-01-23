@@ -1,5 +1,5 @@
 use crate::ac::{AnimatedCorpse, AnimatedCorpseBase};
-use crate::event::{ZoneEvent};
+use crate::event::ZoneEvent;
 use crate::message::{Message, ZoneMessage};
 use crate::zone::Zone;
 use serde_derive::{Deserialize, Serialize};

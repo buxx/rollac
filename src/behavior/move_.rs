@@ -30,8 +30,6 @@ impl Behavior for Move {
         event: &ZoneEvent,
         _zone: &Zone,
     ) -> Vec<Message> {
-        let mut messages: Vec<Message> = vec![];
-
         match &event.event_type {
             ZoneEventType::AnimatedCorpseMove {
                 to_row_i: _,
@@ -45,7 +43,7 @@ impl Behavior for Move {
             _ => {}
         }
 
-        messages
+        vec![]
     }
 
     fn on_animate(

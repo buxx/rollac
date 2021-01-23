@@ -1,3 +1,4 @@
+use crate::client::Client;
 use crate::tile::world::WorldTiles;
 use crate::util;
 
@@ -58,4 +59,39 @@ impl World {
 
         None
     }
+}
+
+pub fn new(client: &Client) -> World {
+    let world_source = match client.get_world_source() {
+        Ok(world_source) => world_source,
+        Err(msg) => {
+            panic!(msg)
+        }
+    };
+    let legend = match util::extract_block_from_source("LEGEND", world_source.as_str()) {
+        Ok(legend) => legend,
+        Err(msg) => {
+            panic!(msg)
+        }
+    };
+    let world_raw = match util::extract_block_from_source("GEO", world_source.as_str()) {
+        Ok(world_raw) => world_raw,
+        Err(msg) => {
+            panic!(msg)
+        }
+    };
+    let world_tiles = match WorldTiles::new(legend.as_str()) {
+        Ok(world_tiles) => world_tiles,
+        Err(msg) => {
+            panic!(msg)
+        }
+    };
+    let world = match World::new(world_raw.as_str(), &world_tiles) {
+        Ok(world) => world,
+        Err(msg) => {
+            panic!(msg)
+        }
+    };
+
+    world
 }

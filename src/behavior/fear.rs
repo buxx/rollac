@@ -1,4 +1,4 @@
-use crate::ac::{AnimatedCorpse};
+use crate::ac::AnimatedCorpse;
 use crate::behavior::Behavior;
 use crate::event::{ZoneEvent, ZoneEventType};
 use crate::message::{Message, SendEventMessage};
