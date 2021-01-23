@@ -117,7 +117,7 @@ impl Zone {
                 for animated_corpse in self.animated_corpses.iter_mut() {
                     match message {
                         ZoneMessage::UpdateAnimatedCorpsePosition(
-                            (animated_corpse_id, _, _),
+                            animated_corpse_id,
                             zone_row_id,
                             zone_col_id,
                         ) => {
@@ -130,7 +130,7 @@ impl Zone {
                     }
                 }
             }
-            ZoneMessage::UpdateCharacterPosition((character_id, _, _), to_row_i, to_col_i) => {
+            ZoneMessage::UpdateCharacterPosition(character_id, to_row_i, to_col_i) => {
                 for character in self.characters.iter_mut() {
                     if character.id == character_id {
                         character.zone_row_i = to_row_i;
@@ -138,7 +138,7 @@ impl Zone {
                     }
                 }
             }
-            ZoneMessage::RemoveCharacter((character_id, _, _)) => {
+            ZoneMessage::RemoveCharacter(character_id) => {
                 if let Some(position_to_remove) = self
                     .characters
                     .iter()
@@ -147,8 +147,7 @@ impl Zone {
                     self.characters.remove(position_to_remove);
                 }
             }
-            ZoneMessage::AddCharacter((character_id, row_i, col_i)) => {
-                // FIXME BS NOW: when move, this new character is not knew ...
+            ZoneMessage::AddCharacter(character_id, row_i, col_i) => {
                 self.characters.push(Character {
                     id: character_id,
                     zone_row_i: row_i,

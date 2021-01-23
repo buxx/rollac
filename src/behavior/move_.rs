@@ -61,25 +61,25 @@ impl Behavior for Move {
         {
             let mut near_character = false;
             for character in &zone.characters {
+                // FIXME: impelment retry (5 times for example)
                 if util::is_near(
                     (character.zone_row_i, character.zone_col_i),
                     (*move_to_row_i, *move_to_col_i),
-                    1,
+                    2,
                 ) {
                     near_character = true;
                     break;
                 }
             }
             if !near_character {
-                messages.push(Message::Event(SendEventMessage::RequireMove(
-                    (
+                messages.push(Message::Event(
+                    SendEventMessage::RequireAnimatedCorpseMove(
                         animated_corpse.id(),
-                        animated_corpse.zone_row_i(),
-                        animated_corpse.zone_row_i(),
+                        *move_to_row_i,
+                        *move_to_col_i,
                     ),
-                    *move_to_row_i,
-                    *move_to_col_i,
-                )));
+                    (animated_corpse.world_row_i(), animated_corpse.world_col_i()),
+                ));
             }
         }
 

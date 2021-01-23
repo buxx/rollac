@@ -1,25 +1,29 @@
 use crate::model;
 
-pub type MessageAnimatedCorpseBase = (u32, u32, u32);
-pub type MessageCharacterBase = (String, u32, u32);
-pub type MessageBuildBase = (String, u32, u32);
+pub type ZoneRowI = u32;
+pub type ZoneColI = u32;
+pub type WorldRowI = u32;
+pub type WorldColI = u32;
+pub type AnimatedCorpseId = u32;
+pub type CharacterId = String;
+pub type ZoneCoordinates = (WorldRowI, WorldColI);
 
 #[derive(Debug, Clone)]
 pub enum SendEventMessage {
-    RequireMove(MessageAnimatedCorpseBase, u32, u32),
+    RequireAnimatedCorpseMove(AnimatedCorpseId, ZoneRowI, ZoneColI),
 }
 
 #[derive(Debug, Clone)]
 pub enum ZoneMessage {
-    UpdateAnimatedCorpsePosition(MessageAnimatedCorpseBase, u32, u32),
-    UpdateCharacterPosition(MessageCharacterBase, u32, u32),
+    UpdateAnimatedCorpsePosition(AnimatedCorpseId, ZoneRowI, ZoneColI),
+    UpdateCharacterPosition(CharacterId, ZoneRowI, ZoneColI),
     AddBuild(model::Build),
-    AddCharacter(MessageCharacterBase),
-    RemoveCharacter(MessageCharacterBase),
+    AddCharacter(CharacterId, ZoneRowI, ZoneColI), // FIXME model::Character
+    RemoveCharacter(CharacterId),
 }
 
 #[derive(Debug, Clone)]
 pub enum Message {
-    Event(SendEventMessage),
-    Zone(ZoneMessage),
+    Event(SendEventMessage, ZoneCoordinates),
+    Zone(ZoneMessage, ZoneCoordinates),
 }

@@ -29,8 +29,8 @@ pub enum ZoneEventType {
         animated_corpse_id: u32,
     },
     CharacterEnter {
-        zone_row_i: i32,
-        zone_col_i: i32,
+        zone_row_i: u32,
+        zone_col_i: u32,
         character_id: String,
     },
     CharacterExit {
@@ -95,8 +95,8 @@ impl ZoneEvent {
                 world_col_i,
                 event_type_name: String::from(CHARACTER_ENTER_ZONE),
                 event_type: ZoneEventType::CharacterEnter {
-                    zone_row_i: data["zone_row_i"].as_i64().unwrap() as i32,
-                    zone_col_i: data["zone_col_i"].as_i64().unwrap() as i32,
+                    zone_row_i: data["zone_row_i"].as_i64().unwrap() as u32,
+                    zone_col_i: data["zone_col_i"].as_i64().unwrap() as u32,
                     character_id: String::from(data["character_id"].as_str().unwrap()),
                 },
             }),
@@ -141,10 +141,10 @@ impl ZoneEvent {
         }
     }
 
-    pub fn from_message(message: SendEventMessage) -> Self {
+    pub fn from_message(message: SendEventMessage, world_row_i: u32, world_col_i: u32) -> Self {
         match message {
-            SendEventMessage::RequireMove(
-                (animated_corpse_id, world_row_i, world_col_i),
+            SendEventMessage::RequireAnimatedCorpseMove(
+                animated_corpse_id,
                 zone_row_i,
                 zone_col_i,
             ) => Self {

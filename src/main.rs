@@ -43,44 +43,48 @@ async fn on_events(
                 to_col_i,
                 character_id,
             } => {
-                messages.push(Message::Zone(ZoneMessage::UpdateCharacterPosition(
-                    (character_id.clone(), event.world_row_i, event.world_col_i),
-                    *to_row_i,
-                    *to_col_i,
-                )));
+                messages.push(Message::Zone(
+                    ZoneMessage::UpdateCharacterPosition(
+                        character_id.clone(),
+                        *to_row_i,
+                        *to_col_i,
+                    ),
+                    (event.world_row_i, event.world_col_i),
+                ));
             }
             ZoneEventType::AnimatedCorpseMove {
                 to_row_i,
                 to_col_i,
                 animated_corpse_id,
-            } => messages.push(Message::Zone(ZoneMessage::UpdateAnimatedCorpsePosition(
-                (*animated_corpse_id, event.world_row_i, event.world_col_i),
-                *to_row_i,
-                *to_col_i,
-            ))),
+            } => messages.push(Message::Zone(
+                ZoneMessage::UpdateAnimatedCorpsePosition(
+                    *animated_corpse_id,
+                    *to_row_i,
+                    *to_col_i,
+                ),
+                (event.world_row_i, event.world_col_i),
+            )),
             ZoneEventType::CharacterEnter {
                 zone_row_i,
                 zone_col_i,
                 character_id,
             } => {
-                messages.push(Message::Zone(ZoneMessage::AddCharacter((
-                    character_id.clone(),
-                    event.world_row_i,
-                    event.world_col_i,
-                ))));
-                continue;
+                messages.push(Message::Zone(
+                    ZoneMessage::AddCharacter(character_id.clone(), *zone_row_i, *zone_col_i),
+                    (event.world_row_i, event.world_col_i),
+                ));
             }
             ZoneEventType::CharacterExit { character_id } => {
-                messages.push(Message::Zone(ZoneMessage::RemoveCharacter((
-                    character_id.clone(),
-                    event.world_row_i,
-                    event.world_col_i,
-                ))));
-                continue;
+                messages.push(Message::Zone(
+                    ZoneMessage::RemoveCharacter(character_id.clone()),
+                    (event.world_row_i, event.world_col_i),
+                ));
             }
             ZoneEventType::NewBuild { build } => {
-                messages.push(Message::Zone(ZoneMessage::AddBuild(build.clone())));
-                continue;
+                messages.push(Message::Zone(
+                    ZoneMessage::AddBuild(build.clone()),
+                    (event.world_row_i, event.world_col_i),
+                ));
             }
         }
 
@@ -134,15 +138,21 @@ async fn on_messages(
 ) {
     while let Ok(message) = channel_receiver.recv().await {
         match message {
-            Message::Event(send_event_message) => {
+            Message::Event(event_message, (world_row_i, world_col_i)) => {
                 socket
-                    .send(ZoneEvent::from_message(send_event_message))
+                    .send(ZoneEvent::from_message(
+                        event_message,
+                        world_row_i,
+                        world_col_i,
+                    ))
                     .await
             }
-            Message::Zone(animated_corpse_message) => {
+            Message::Zone(zone_message, (world_row_i, world_col_i)) => {
                 // FIXME BS: check zone match
                 for zone in zones.lock().await.iter_mut() {
-                    zone.on_message(animated_corpse_message.clone())
+                    if zone.world_row_i == world_row_i && zone.world_col_i == world_col_i {
+                        zone.on_message(zone_message.clone())
+                    }
                 }
             }
         }
