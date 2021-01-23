@@ -1,4 +1,9 @@
-use crate::model;
+use async_std::channel::Receiver;
+use async_std::sync::Mutex;
+
+use crate::{model, socket};
+use crate::event::ZoneEvent;
+use crate::zone::Zone;
 
 pub type ZoneRowI = u32;
 pub type ZoneColI = u32;
@@ -26,4 +31,35 @@ pub enum ZoneMessage {
 pub enum Message {
     Event(SendEventMessage, ZoneCoordinates),
     Zone(ZoneMessage, ZoneCoordinates),
+}
+
+pub async fn on_messages(
+    zones: &Mutex<Vec<Zone>>,
+    channel_receiver: Receiver<Message>,
+    socket: &socket::Channel,
+) {
+    while let Ok(message) = channel_receiver.recv().await {
+        match message {
+            Message::Event(event_message, (world_row_i, world_col_i)) => {
+                socket
+                    .send(ZoneEvent::from_message(
+                        event_message,
+                        world_row_i,
+                        world_col_i,
+                    ))
+                    .await
+            }
+            Message::Zone(zone_message, (world_row_i, world_col_i)) => {
+                // FIXME BS: check zone match
+                for zone in zones.lock().await.iter_mut() {
+                    if zone.world_row_i == world_row_i && zone.world_col_i == world_col_i {
+                        zone.on_message(zone_message.clone())
+                    }
+                }
+            }
+        }
+    }
+
+    // TODO: manage daemon close
+    panic!("Channel is closed !");
 }

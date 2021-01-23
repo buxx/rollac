@@ -1,9 +1,11 @@
-use async_std::channel::{unbounded, Receiver, Sender};
+use std::time::{Duration, Instant};
+
+use async_std::channel::{Receiver, Sender, unbounded};
 use async_std::pin::Pin;
 use async_std::sync::Mutex;
 use async_std::task;
 use futures::future::join_all;
-use std::time::{Duration, Instant};
+use log;
 
 use crate::ac::AnimatedCorpse;
 use crate::event::{ZoneEvent, ZoneEventType};
@@ -25,142 +27,6 @@ mod world;
 mod zone;
 
 const TICK_EACH_MS: u64 = 1000;
-
-async fn on_events(
-    zones: &Mutex<Vec<Zone>>,
-    channel_sender: &Sender<Message>,
-    socket: &socket::Channel,
-) {
-    while let Ok(event) = socket.from_websocket_receiver.recv().await {
-        let mut messages: Vec<Message> = vec![];
-
-        match &event.event_type {
-            // Ignore internal mechanisms events
-            ZoneEventType::ClientWantClose | ZoneEventType::ServerPermitClose => continue,
-            // First convert some event to messages
-            ZoneEventType::PlayerMove {
-                to_row_i,
-                to_col_i,
-                character_id,
-            } => {
-                messages.push(Message::Zone(
-                    ZoneMessage::UpdateCharacterPosition(
-                        character_id.clone(),
-                        *to_row_i,
-                        *to_col_i,
-                    ),
-                    (event.world_row_i, event.world_col_i),
-                ));
-            }
-            ZoneEventType::AnimatedCorpseMove {
-                to_row_i,
-                to_col_i,
-                animated_corpse_id,
-            } => messages.push(Message::Zone(
-                ZoneMessage::UpdateAnimatedCorpsePosition(
-                    *animated_corpse_id,
-                    *to_row_i,
-                    *to_col_i,
-                ),
-                (event.world_row_i, event.world_col_i),
-            )),
-            ZoneEventType::CharacterEnter {
-                zone_row_i,
-                zone_col_i,
-                character_id,
-            } => {
-                messages.push(Message::Zone(
-                    ZoneMessage::AddCharacter(character_id.clone(), *zone_row_i, *zone_col_i),
-                    (event.world_row_i, event.world_col_i),
-                ));
-            }
-            ZoneEventType::CharacterExit { character_id } => {
-                messages.push(Message::Zone(
-                    ZoneMessage::RemoveCharacter(character_id.clone()),
-                    (event.world_row_i, event.world_col_i),
-                ));
-            }
-            ZoneEventType::NewBuild { build } => {
-                messages.push(Message::Zone(
-                    ZoneMessage::AddBuild(build.clone()),
-                    (event.world_row_i, event.world_col_i),
-                ));
-            }
-        }
-
-        for zone in zones.lock().await.iter_mut() {
-            if event.world_row_i == zone.world_row_i && event.world_col_i == zone.world_col_i {
-                messages.extend(zone.on_event(&event));
-            }
-        }
-
-        for message in messages {
-            if let Err(_) = channel_sender.send(message).await {
-                panic!("Channel is closed !")
-            }
-        }
-    }
-}
-
-async fn animate(zones: &Mutex<Vec<Zone>>, channel_sender: &Sender<Message>) {
-    let mut tick_count: u64 = 0;
-    let mut last_tick = Instant::now();
-    loop {
-        let now = Instant::now();
-        let last_tick_duration = now - last_tick;
-        task::sleep(Duration::from_millis(
-            TICK_EACH_MS - last_tick_duration.as_millis() as u64,
-        ))
-        .await;
-        last_tick = Instant::now();
-        let mut messages: Vec<Message> = vec![];
-
-        {
-            for zone in zones.lock().await.iter_mut() {
-                messages.extend(zone.animate(tick_count))
-            }
-        };
-
-        for message in messages {
-            if let Err(_) = channel_sender.send(message).await {
-                panic!("Channel is closed !")
-            };
-        }
-
-        tick_count += 1;
-    }
-}
-
-async fn on_messages(
-    zones: &Mutex<Vec<Zone>>,
-    channel_receiver: Receiver<Message>,
-    socket: &socket::Channel,
-) {
-    while let Ok(message) = channel_receiver.recv().await {
-        match message {
-            Message::Event(event_message, (world_row_i, world_col_i)) => {
-                socket
-                    .send(ZoneEvent::from_message(
-                        event_message,
-                        world_row_i,
-                        world_col_i,
-                    ))
-                    .await
-            }
-            Message::Zone(zone_message, (world_row_i, world_col_i)) => {
-                // FIXME BS: check zone match
-                for zone in zones.lock().await.iter_mut() {
-                    if zone.world_row_i == world_row_i && zone.world_col_i == world_col_i {
-                        zone.on_message(zone_message.clone())
-                    }
-                }
-            }
-        }
-    }
-
-    // TODO: manage daemon close
-    panic!("Channel is closed !");
-}
 
 async fn daemon() {
     // Prepare required variables
@@ -199,7 +65,7 @@ async fn daemon() {
             let zone_animated_corpses: Vec<Box<dyn AnimatedCorpse + Send + Sync>> = client
                 .get_animated_corpses(world_row_i as u32, world_col_i as u32)
                 .expect("Error during grab of animated corpses");
-            println!(
+            log::info!(
                 "Found {} animated corpses for zone {}.{}",
                 zone_animated_corpses.len(),
                 world_row_i,
@@ -262,7 +128,7 @@ async fn daemon() {
             }
         }
     }
-    println!(
+    log::info!(
         "Total of animated corpses found: {}",
         found_animated_corpses
     );
@@ -270,13 +136,14 @@ async fn daemon() {
     let zones: Mutex<Vec<Zone>> = Mutex::new(zones);
     let mut futures: Vec<Pin<Box<dyn futures::Future<Output = ()> + std::marker::Send>>> = vec![];
 
-    futures.push(Box::pin(on_events(&zones, &channel_sender, &socket)));
-    futures.push(Box::pin(animate(&zones, &channel_sender)));
-    futures.push(Box::pin(on_messages(&zones, channel_receiver, &socket)));
+    futures.push(Box::pin(event::on_events(&zones, &channel_sender, &socket)));
+    futures.push(Box::pin(ac::animate(&zones, &channel_sender)));
+    futures.push(Box::pin(message::on_messages(&zones, channel_receiver, &socket)));
 
     join_all(futures).await;
 }
 
 fn main() {
-    task::block_on(daemon())
+    env_logger::init();
+    task::block_on(daemon());
 }
