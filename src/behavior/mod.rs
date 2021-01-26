@@ -16,6 +16,12 @@ pub fn get_behaviors_for(
                 Box::new(fear::Fear::from_animated_corpse(animated_corpse)),
             ]
         }
+        _ => {
+            vec![
+                Box::new(move_::Move::from_animated_corpse(animated_corpse)),
+                Box::new(fear::Fear::from_animated_corpse(animated_corpse)),
+            ]
+        }
     }
 }
 

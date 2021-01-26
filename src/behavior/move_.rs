@@ -7,6 +7,7 @@ use crate::zone::Zone;
 use rand::seq::SliceRandom;
 
 pub struct Move {
+    pub animate_each: u8,
     pub move_in_pack: bool,
 }
 
@@ -14,14 +15,28 @@ impl Move {
     pub fn from_animated_corpse(animated_corpse: &Box<dyn AnimatedCorpse + Send + Sync>) -> Self {
         let move_in_pack = match animated_corpse.type_() {
             Type::HARE => true,
+            Type::GOAT => true,
+            Type::MOORHEN => true,
+            Type::PIG => true,
+            Type::CRAB => false,
         };
-        Self { move_in_pack }
+        let animate_each = match animated_corpse.type_() {
+            Type::HARE => 3,
+            Type::GOAT => 5,
+            Type::MOORHEN => 2,
+            Type::PIG => 3,
+            Type::CRAB => 7,
+        };
+        Self {
+            move_in_pack,
+            animate_each,
+        }
     }
 }
 
 impl Behavior for Move {
     fn animate_each(&self) -> Option<u8> {
-        Some(1)
+        Some(self.animate_each)
     }
 
     fn on_event(

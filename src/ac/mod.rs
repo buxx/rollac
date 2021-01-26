@@ -6,17 +6,23 @@ use async_std::task::sleep;
 use serde_derive::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::ac::generic::Generic;
 use crate::ac::hare::Hare;
 use crate::event::ZoneEvent;
 use crate::message::{Message, ZoneMessage};
 use crate::zone::Zone;
 use crate::TICK_EACH_MS;
 
+pub mod generic;
 pub mod hare;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 pub enum Type {
     HARE,
+    GOAT,
+    MOORHEN,
+    PIG,
+    CRAB,
 }
 
 pub fn animated_corpse_from_value(
@@ -26,7 +32,7 @@ pub fn animated_corpse_from_value(
     let type_ = value["type_"].as_str().unwrap();
     match type_ {
         "HARE" => Ok(Box::new(Hare::new(base))),
-        _ => Err(format!("Unknown type {}", type_)),
+        _ => Ok(Box::new(Generic::new(base))),
     }
 }
 
