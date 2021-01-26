@@ -4,6 +4,7 @@ use async_std::sync::Mutex;
 use async_std::task;
 use futures::future::join_all;
 use log;
+use structopt::StructOpt;
 
 use crate::ac::AnimatedCorpse;
 use crate::zone::Zone;
@@ -22,14 +23,29 @@ mod zone;
 
 const TICK_EACH_MS: u64 = 1000;
 
+
+#[derive(StructOpt, Debug)]
+#[structopt(name = "basic")]
+struct Opt {
+    #[structopt(name = "host", default_value = "127.0.0.1")]
+    host: String,
+
+    #[structopt(name = "port", default_value = "5000")]
+    port: u16,
+}
+
 async fn daemon() {
+    let opt = Opt::from_args();
+    let host: String = opt.host;
+    let port: u16 = opt.port;
+
     // Prepare required variables
     let mut zones: Vec<Zone> = vec![];
-    let client = client::Client::new("127.0.0.1", 5000);
+    let client = client::Client::new(&host, port);
     let (channel_sender, channel_receiver) = unbounded();
 
     // Connect to world socket
-    let url = "http://127.0.0.1:5000/world/events".to_string();
+    let url = format!("http://{}:{}/world/events", host, port);
     log::info!("Connect socket on {}", url);
     let mut socket = socket::Channel::new(url);
     socket.connect();
