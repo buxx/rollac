@@ -3,7 +3,6 @@ extern crate websocket;
 use self::websocket::OwnedMessage;
 use async_std::channel::{unbounded, Receiver, Sender};
 use async_std::task;
-use serde_json::Value;
 use std::io::Error;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -13,7 +12,10 @@ use std::time::Duration;
 use std::time::SystemTime;
 use websocket::{ClientBuilder, Message, WebSocketError};
 
+use self::websocket::client::sync::Client;
+use crate::error;
 use crate::event;
+use std::net::TcpStream;
 
 pub struct Channel {
     ws_address: String,
@@ -51,58 +53,71 @@ impl Channel {
         }
     }
 
-    pub fn connect(&mut self) {
+    fn create_ws_client(&mut self) -> Result<Client<TcpStream>, error::Error> {
+        match ClientBuilder::new(self.ws_address.as_str()) {
+            Ok(mut ws_client) => match ws_client.connect_insecure() {
+                Ok(ws_client) => Ok(ws_client),
+                Err(err) => {
+                    return Err(error::Error::new(format!(
+                        "Fail to connect websocket: {}",
+                        err
+                    )))
+                }
+            },
+            Err(err) => return Err(error::Error::new(format!("Bad websocket url: {}", err))),
+        }
+    }
+
+    pub fn connect(&mut self) -> Result<(), error::Error> {
         let from_main_receiver = Arc::clone(&self.from_main_receiver);
         let from_websocket_sender = Arc::clone(&self.from_websocket_sender);
         let ws_reader_closed = Arc::clone(&self.ws_reader_closed);
         let ws_sender_closed = Arc::clone(&self.ws_sender_closed);
-
-        let ws_client = ClientBuilder::new(self.ws_address.as_str())
-            .unwrap()
-            .connect_insecure()
-            .unwrap();
+        let ws_client = self.create_ws_client()?;
         let (mut ws_reader, mut ws_writer) = ws_client.split().unwrap();
 
         // ws reader
         let ws_reader_handle = thread::spawn(move || {
             task::block_on(async {
-                let from_websocket_sender = from_websocket_sender.lock().unwrap();
+                let from_websocket_sender = from_websocket_sender
+                    .lock()
+                    .expect("Fail to acquire from_websocket_sender lock");
                 for message in ws_reader.incoming_messages() {
                     match message {
                         Ok(OwnedMessage::Text(message)) => {
-                            let value: Value = serde_json::from_str(&message).unwrap();
-                            match event::ZoneEvent::from_value(value) {
-                                Ok(event) => {
-                                    let mut break_ = false;
-                                    if let event::ZoneEventType::ServerPermitClose =
-                                        event.event_type
-                                    {
-                                        break_ = true;
-                                    }
+                            match serde_json::from_str(&message) {
+                                Ok(value) => match event::ZoneEvent::from_value(value) {
+                                    Ok(event) => {
+                                        if let event::ZoneEventType::ServerPermitClose =
+                                            event.event_type
+                                        {
+                                            log::info!("Receive close event from websocket");
+                                            break;
+                                        }
 
-                                    if let Err(_) = from_websocket_sender.send(event).await {
-                                        panic!(
+                                        if let Err(_) = from_websocket_sender.send(event).await {
+                                            log::error!(
                                             "Something went wrong during process of received event"
-                                        );
+                                            );
+                                            break;
+                                        }
                                     }
-
-                                    if break_ {
-                                        println!("Receive close event from websocket");
-                                        break;
-                                    }
+                                    Err(err) => log::error!("Error while decoding event: {}", err),
+                                },
+                                Err(err) => {
+                                    log::error!("Error when interpreting event as str: {}", err)
                                 }
-                                Err(err) => println!("Error while decoding event: {}", err),
-                            }
+                            };
                         }
                         Ok(OwnedMessage::Close(_)) => {
-                            println!("Close web socket message received");
+                            log::info!("Close web socket message received");
                             break;
                         }
                         Err(WebSocketError::NoDataAvailable) => {
-                            println!("Web socket error: NoDataAvailable");
+                            log::error!("Web socket error: NoDataAvailable");
                             break;
                         }
-                        _ => eprintln!(
+                        _ => log::error!(
                             "WebSocket(receiver): Unknown websocket message received: {:?}",
                             message
                         ), // TODO add ping/pong (OwnedMessage::ping|pong)
@@ -112,7 +127,7 @@ impl Channel {
 
             let mut closed = ws_reader_closed.lock().unwrap();
             *closed = true;
-            println!("Web socket reader is closed");
+            log::info!("Web socket reader is closed");
         });
 
         // ws sender
@@ -121,17 +136,25 @@ impl Channel {
                 let from_main_receiver = from_main_receiver.lock().unwrap();
 
                 while let Ok(received) = from_main_receiver.recv().await {
-                    let message_json_str = serde_json::to_string(&received).unwrap();
+                    let message_json_str = match serde_json::to_string(&received) {
+                        Ok(message_json_str) => message_json_str,
+                        Err(err) => {
+                            log::error!("Error during serialisation of event: {}", err);
+                            continue;
+                        }
+                    };
                     let message = Message::text(message_json_str);
-                    ws_writer.send_message(&message).unwrap();
+                    if let Err(err) = ws_writer.send_message(&message) {
+                        log::error!("Error during send message: {}", err);
+                    };
 
                     if let event::ZoneEventType::ClientWantClose = received.event_type {
                         // Get out for loop (and finish thread)
-                        println!("Web socket writer is closing ...");
+                        log::info!("Web socket writer is closing ...");
                         break;
                     }
                 }
-                println!("Web socker writer is closed");
+                log::info!("Web socker writer is closed");
             });
 
             let mut closed = ws_sender_closed.lock().unwrap();
@@ -140,11 +163,13 @@ impl Channel {
 
         self.ws_reader_handle = Some(ws_reader_handle);
         self.ws_sender_handle = Some(ws_sender_handle);
+
+        Ok(())
     }
 
     pub async fn send(&self, event: event::ZoneEvent) {
         if let Err(_) = self.from_main_sender.send(event).await {
-            panic!("Error happen when transmit event to send though websocket")
+            log::error!("Error happen when transmit event to send though websocket")
         }
     }
 
@@ -169,7 +194,7 @@ impl Channel {
             }
 
             if start.elapsed().unwrap() > timeout {
-                eprintln!(
+                log::error!(
                     "WebSockets: timeout reached, force closing (ws_sender_closed: {}, ws_reader_closed: {})",
                     ws_sender_closed, ws_reader_closed
                 );

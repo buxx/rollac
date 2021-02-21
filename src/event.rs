@@ -6,6 +6,7 @@ use serde::ser::{Serialize, SerializeStruct, Serializer};
 use serde_derive::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::error::Error;
 use crate::message::{Message, SendEventMessage, ZoneMessage};
 use crate::zone::Zone;
 use crate::{model, socket};
@@ -54,13 +55,15 @@ pub struct ZoneEvent {
     pub world_col_i: u32,
 }
 
+const DE_ERR_MSG: &str = "Deserialize error";
+
 impl ZoneEvent {
     // TODO: by hand for now ... how to do automatic ?
-    pub fn from_value(value: Value) -> Result<Self, String> {
-        let type_ = value["type"].as_str().unwrap();
-        let world_row_i = value["world_row_i"].as_i64().unwrap() as u32;
-        let world_col_i = value["world_col_i"].as_i64().unwrap() as u32;
-        let data = value.get("data").unwrap();
+    pub fn from_value(value: Value) -> Result<Self, Error> {
+        let type_ = value["type"].as_str().expect(DE_ERR_MSG);
+        let world_row_i = value["world_row_i"].as_i64().expect(DE_ERR_MSG) as u32;
+        let world_col_i = value["world_col_i"].as_i64().expect(DE_ERR_MSG) as u32;
+        let data = value.get("data").expect(DE_ERR_MSG);
 
         match &type_ {
             &PLAYER_MOVE => Ok(ZoneEvent {
@@ -68,9 +71,9 @@ impl ZoneEvent {
                 world_col_i,
                 event_type_name: String::from(PLAYER_MOVE),
                 event_type: ZoneEventType::PlayerMove {
-                    to_row_i: data["to_row_i"].as_i64().unwrap() as u32,
-                    to_col_i: data["to_col_i"].as_i64().unwrap() as u32,
-                    character_id: String::from(data["character_id"].as_str().unwrap()),
+                    to_row_i: data["to_row_i"].as_i64().expect(DE_ERR_MSG) as u32,
+                    to_col_i: data["to_col_i"].as_i64().expect(DE_ERR_MSG) as u32,
+                    character_id: String::from(data["character_id"].as_str().expect(DE_ERR_MSG)),
                 },
             }),
             &ANIMATED_CORPSE_MOVE => Ok(ZoneEvent {
@@ -78,9 +81,10 @@ impl ZoneEvent {
                 world_col_i,
                 event_type_name: String::from(ANIMATED_CORPSE_MOVE),
                 event_type: ZoneEventType::AnimatedCorpseMove {
-                    to_row_i: data["to_row_i"].as_i64().unwrap() as u32,
-                    to_col_i: data["to_col_i"].as_i64().unwrap() as u32,
-                    animated_corpse_id: data["animated_corpse_id"].as_i64().unwrap() as u32,
+                    to_row_i: data["to_row_i"].as_i64().expect(DE_ERR_MSG) as u32,
+                    to_col_i: data["to_col_i"].as_i64().expect(DE_ERR_MSG) as u32,
+                    animated_corpse_id: data["animated_corpse_id"].as_i64().expect(DE_ERR_MSG)
+                        as u32,
                 },
             }),
             &CLIENT_WANT_CLOSE => Ok(ZoneEvent {
@@ -100,9 +104,9 @@ impl ZoneEvent {
                 world_col_i,
                 event_type_name: String::from(CHARACTER_ENTER_ZONE),
                 event_type: ZoneEventType::CharacterEnter {
-                    zone_row_i: data["zone_row_i"].as_i64().unwrap() as u32,
-                    zone_col_i: data["zone_col_i"].as_i64().unwrap() as u32,
-                    character_id: String::from(data["character_id"].as_str().unwrap()),
+                    zone_row_i: data["zone_row_i"].as_i64().expect(DE_ERR_MSG) as u32,
+                    zone_col_i: data["zone_col_i"].as_i64().expect(DE_ERR_MSG) as u32,
+                    character_id: String::from(data["character_id"].as_str().expect(DE_ERR_MSG)),
                 },
             }),
             &CHARACTER_EXIT_ZONE => Ok(ZoneEvent {
@@ -110,21 +114,21 @@ impl ZoneEvent {
                 world_col_i,
                 event_type_name: String::from(CHARACTER_EXIT_ZONE),
                 event_type: ZoneEventType::CharacterExit {
-                    character_id: String::from(data["character_id"].as_str().unwrap()),
+                    character_id: String::from(data["character_id"].as_str().expect(DE_ERR_MSG)),
                 },
             }),
             &NEW_BUILD => {
-                let build_data = data["build"].as_object().unwrap();
+                let build_data = data["build"].as_object().expect(DE_ERR_MSG);
                 let mut traversable: HashMap<String, bool> = HashMap::new();
                 traversable.insert(
                     "WALKING".to_string(),
                     build_data["traversable"]
                         .as_object()
-                        .unwrap()
+                        .expect(DE_ERR_MSG)
                         .get("WALKING")
-                        .unwrap()
+                        .expect(DE_ERR_MSG)
                         .as_bool()
-                        .unwrap(),
+                        .expect(DE_ERR_MSG),
                 );
 
                 Ok(ZoneEvent {
@@ -133,16 +137,19 @@ impl ZoneEvent {
                     event_type_name: String::from(NEW_BUILD),
                     event_type: ZoneEventType::NewBuild {
                         build: model::Build {
-                            id: build_data["id"].as_i64().unwrap() as u32,
-                            build_id: build_data["build_id"].as_str().unwrap().to_string(),
-                            row_i: build_data["row_i"].as_i64().unwrap() as u32,
-                            col_i: build_data["col_i"].as_i64().unwrap() as u32,
+                            id: build_data["id"].as_i64().expect(DE_ERR_MSG) as u32,
+                            build_id: build_data["build_id"]
+                                .as_str()
+                                .expect(DE_ERR_MSG)
+                                .to_string(),
+                            row_i: build_data["row_i"].as_i64().expect(DE_ERR_MSG) as u32,
+                            col_i: build_data["col_i"].as_i64().expect(DE_ERR_MSG) as u32,
                             traversable,
                         },
                     },
                 })
             }
-            _ => Err(format!("Unknown event {}", &type_)),
+            _ => Err(Error::new(format!("Unknown event {}", &type_))),
         }
     }
 

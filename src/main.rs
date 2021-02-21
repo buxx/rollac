@@ -12,6 +12,7 @@ use crate::zone::Zone;
 mod ac;
 mod behavior;
 mod client;
+mod error;
 mod event;
 mod message;
 mod model;
@@ -23,7 +24,6 @@ mod zone;
 
 const TICK_EACH_MS: u64 = 1000;
 
-
 #[derive(StructOpt, Debug)]
 #[structopt(name = "basic")]
 struct Opt {
@@ -34,7 +34,7 @@ struct Opt {
     port: u16,
 }
 
-async fn daemon() {
+async fn daemon() -> Result<(), error::Error> {
     let opt = Opt::from_args();
     let host: String = opt.host;
     let port: u16 = opt.port;
@@ -48,7 +48,7 @@ async fn daemon() {
     let url = format!("http://{}:{}/world/events", host, port);
     log::info!("Connect socket on {}", url);
     let mut socket = socket::Channel::new(url);
-    socket.connect();
+    socket.connect()?;
 
     // Grab world information
     log::info!("Retrieve world from api");
@@ -95,9 +95,11 @@ async fn daemon() {
     )));
 
     join_all(futures).await;
+    Ok(())
 }
 
-fn main() {
+fn main() -> Result<(), error::Error> {
     env_logger::init();
-    task::block_on(daemon());
+    task::block_on(daemon())?;
+    Ok(())
 }

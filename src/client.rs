@@ -18,6 +18,7 @@ pub enum ClientError {
     NotFound { message: String },
     ClientSideError { message: String },
     ServerSideError { message: String },
+    InternalError,
 }
 
 impl Error for ClientError {}
@@ -32,9 +33,22 @@ impl ClientError {
             ClientError::ServerSideError { message } => {
                 format!("Server side error: {}", message).to_string()
             }
+            ClientError::InternalError => format!("Internal error"),
         };
     }
 }
+
+impl From<reqwest::Error> for ClientError {
+    fn from(_: reqwest::Error) -> Self {
+        Self::InternalError
+    }
+}
+
+// impl From<NoneError> for ClientError {
+//     fn from(_: NoneError) -> Self {
+//         Self::InternalError
+//     }
+// }
 
 impl fmt::Display for ClientError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -71,14 +85,14 @@ impl Client {
         }
 
         if response.status().is_client_error() {
-            let error: ErrorResponse = response.json().unwrap();
+            let error: ErrorResponse = response.json()?;
             return Err(ClientError::ClientSideError {
                 message: error.message,
             });
         }
 
         if !response.status().is_success() {
-            let error: ErrorResponse = response.json().unwrap();
+            let error: ErrorResponse = response.json()?;
             return Err(ClientError::ServerSideError {
                 message: error.message,
             });
@@ -98,12 +112,11 @@ impl Client {
             world_row_i,
             world_col_i
         );
-        let response: Response =
-            self.check_response(self.client.get(url.as_str()).send().unwrap())?;
+        let response: Response = self.check_response(self.client.get(url.as_str()).send()?)?;
 
-        let value = response.json::<Value>().unwrap();
+        let value = response.json::<Value>()?;
         let mut animated_corpses: Vec<Box<dyn AnimatedCorpse + Send + Sync>> = vec![];
-        for item in value.as_array().unwrap().iter() {
+        for item in value.as_array().expect("No array found in response").iter() {
             match animated_corpse_from_value(item.clone()) {
                 Ok(animated_corpse) => {
                     animated_corpses.push(animated_corpse);
@@ -127,10 +140,9 @@ impl Client {
             world_row_i,
             world_col_i
         );
-        let response: Response =
-            self.check_response(self.client.get(url.as_str()).send().unwrap())?;
+        let response: Response = self.check_response(self.client.get(url.as_str()).send()?)?;
 
-        Ok(response.json::<Vec<model::Character>>().unwrap())
+        Ok(response.json::<Vec<model::Character>>()?)
     }
 
     pub fn get_zone_builds(
@@ -144,44 +156,33 @@ impl Client {
             world_row_i,
             world_col_i
         );
-        let response: Response =
-            self.check_response(self.client.get(url.as_str()).send().unwrap())?;
+        let response: Response = self.check_response(self.client.get(url.as_str()).send()?)?;
 
-        Ok(response.json::<Vec<model::Build>>().unwrap())
+        Ok(response.json::<Vec<model::Build>>()?)
     }
 
     pub fn get_world_source(&self) -> Result<String, ClientError> {
         let url = format!("{}/world/source", self.get_base_path(),);
-        let response: Response =
-            self.check_response(self.client.get(url.as_str()).send().unwrap())?;
+        let response: Response = self.check_response(self.client.get(url.as_str()).send()?)?;
 
-        Ok(response.text().unwrap())
+        Ok(response.text()?)
     }
 
-    pub fn get_zone_data(&self, world_row_i: u32, world_col_i: u32) -> Result<Value, String> {
+    pub fn get_zone_data(&self, world_row_i: u32, world_col_i: u32) -> Result<Value, ClientError> {
         let url = format!(
             "{}/zones/{}/{}",
             self.get_base_path(),
             world_row_i,
             world_col_i
         );
-        let response: Response =
-            match self.check_response(self.client.get(url.as_str()).send().unwrap()) {
-                Ok(response) => response,
-                Err(client_error) => return Err(ClientError::get_message(&client_error)),
-            };
-
-        Ok(response.json::<Value>().unwrap())
+        let response: Response = self.check_response(self.client.get(url.as_str()).send()?)?;
+        Ok(response.json::<Value>()?)
     }
 
-    pub fn get_tiles_data(&self) -> Result<Value, String> {
+    pub fn get_tiles_data(&self) -> Result<Value, ClientError> {
         let url = format!("{}/zones/tiles", self.get_base_path());
-        let response: Response =
-            match self.check_response(self.client.get(url.as_str()).send().unwrap()) {
-                Ok(response) => response,
-                Err(client_error) => return Err(ClientError::get_message(&client_error)),
-            };
+        let response: Response = self.check_response(self.client.get(url.as_str()).send()?)?;
 
-        Ok(response.json::<Value>().unwrap())
+        Ok(response.json::<Value>()?)
     }
 }
