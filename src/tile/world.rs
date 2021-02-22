@@ -1,3 +1,4 @@
+use crate::error;
 use crate::tile::TileId;
 use std::collections::HashMap;
 
@@ -8,15 +9,33 @@ pub struct WorldTiles {
 }
 
 impl WorldTiles {
-    pub fn new(legend: &str) -> Result<Self, String> {
+    pub fn new(legend: &str) -> Result<Self, error::Error> {
         let mut default_tile_id: Option<TileId> = None;
 
         let mut codes: HashMap<u16, TileId> = HashMap::new();
 
         for line in legend.lines() {
             let mut split = line.split_ascii_whitespace();
-            let char_ = split.next().unwrap().trim().chars().nth(0).unwrap() as u16;
-            let mut id = split.next().unwrap().trim();
+            let char_ = split
+                .next()
+                .ok_or(error::Error::new(format!(
+                    "Unable to split tile line '{}'",
+                    line
+                )))?
+                .trim()
+                .chars()
+                .nth(0)
+                .ok_or(error::Error::new(format!(
+                    "Unable to read char from line '{}'",
+                    line
+                )))? as u16;
+            let mut id = split
+                .next()
+                .ok_or(error::Error::new(format!(
+                    "Unable to read second tile part from line '{}'",
+                    line
+                )))?
+                .trim();
             if id.ends_with("*") {
                 id = id.trim_end_matches("*");
                 default_tile_id = Some(id.to_string());
@@ -31,7 +50,14 @@ impl WorldTiles {
         })
     }
 
-    pub fn tile_id(&self, code: u16) -> String {
-        self.codes.get(&code).unwrap().clone()
+    pub fn tile_id(&self, code: u16) -> Result<String, error::Error> {
+        Ok(self
+            .codes
+            .get(&code)
+            .ok_or(error::Error::new(format!(
+                "Unable to find tile_id for code '{}'",
+                code
+            )))?
+            .clone())
     }
 }

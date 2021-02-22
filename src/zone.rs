@@ -1,6 +1,7 @@
 use crate::ac::AnimatedCorpse;
 use crate::behavior::get_behaviors_for;
 use crate::client::Client;
+use crate::error;
 use crate::event::ZoneEvent;
 use crate::message::{Message, ZoneMessage};
 use crate::model::Character;
@@ -37,14 +38,15 @@ impl Zone {
         zone_raw: &str,
         tiles: ZoneTiles,
         world_tile_type_id: String,
-    ) -> Result<Self, String> {
+    ) -> Result<Self, error::Error> {
         let height = zone_raw.lines().count() as i32;
-        let longest_line = util::longest_line(zone_raw);
-        if !longest_line.is_some() {
-            return Err("There is no line in given zone source".to_string());
-        }
+        let longest_line = if let Some(longest_line) = util::longest_line(zone_raw) {
+            longest_line
+        } else {
+            return Err(error::Error::new("Zone raw seem to be empty".to_string()));
+        };
 
-        let width = longest_line.unwrap().chars().count() as i32;
+        let width = longest_line.chars().count() as i32;
         let mut rows: Vec<LevelRow> = Vec::new();
 
         for line in zone_raw.lines() {
@@ -218,32 +220,17 @@ pub fn new(
     world_row_i: u32,
     world_col_i: u32,
     animated_corpses: Vec<Box<dyn AnimatedCorpse + Send + Sync>>,
-) -> Zone {
+) -> Result<Zone, error::Error> {
     let world_tile_type_id = world.rows[world_row_i as usize].cols[world_col_i as usize].clone();
-    let server_tiles_data = match client.get_tiles_data() {
-        Ok(server_tiles_data) => server_tiles_data,
-        Err(msg) => {
-            panic!(msg)
-        }
-    };
-    let zone_tiles = ZoneTiles::new(server_tiles_data);
-    let zone_data = match client.get_zone_data(world_row_i as u32, world_col_i as u32) {
-        Ok(zone_data) => zone_data,
-        Err(msg) => {
-            panic!(msg)
-        }
-    };
-    let zone_raw = zone_data["raw_source"].as_str().unwrap();
-    let zone_raw = util::extract_block_from_source(util::BLOCK_GEO, zone_raw).unwrap();
+    let server_tiles_data = client.get_tiles_data()?;
+    let zone_tiles = ZoneTiles::new(server_tiles_data)?;
+    let zone_raw = client.get_zone_source(world_row_i as u32, world_col_i as u32)?;
+    let zone_raw = util::extract_block_from_source(util::BLOCK_GEO, &zone_raw)?;
 
-    let zone_characters = client
-        .get_zone_characters(world_row_i as u32, world_col_i as u32)
-        .unwrap();
-    let zone_builds = client
-        .get_zone_builds(world_row_i as u32, world_col_i as u32)
-        .unwrap();
+    let zone_characters = client.get_zone_characters(world_row_i as u32, world_col_i as u32)?;
+    let zone_builds = client.get_zone_builds(world_row_i as u32, world_col_i as u32)?;
 
-    let zone = match Zone::new(
+    Ok(Zone::new(
         world_row_i as u32,
         world_col_i as u32,
         animated_corpses,
@@ -252,12 +239,5 @@ pub fn new(
         &zone_raw,
         zone_tiles,
         world_tile_type_id,
-    ) {
-        Ok(zone) => zone,
-        Err(msg) => {
-            panic!(msg)
-        }
-    };
-
-    zone
+    )?)
 }
