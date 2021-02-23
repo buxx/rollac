@@ -1,6 +1,7 @@
 use serde_json::Value;
 use std::collections::HashMap;
 
+use crate::error;
 use crate::tile::TileId;
 
 #[derive(Debug)]
@@ -13,13 +14,30 @@ pub const NOTHING: &str = "NOTHING";
 pub const UNKNOWN: &str = "UNKNOWN";
 
 impl ZoneTiles {
-    pub fn new(data: Value) -> Self {
+    pub fn new(data: Value) -> Result<Self, error::Error> {
         let mut codes = HashMap::new();
         let mut browseables = HashMap::new();
 
-        for tile_value in data.as_array().unwrap() {
-            let tile_id: &str = tile_value["id"].as_str().unwrap();
-            let char: u16 = tile_value["char"].as_str().unwrap().chars().nth(0).unwrap() as u16;
+        for tile_value in data.as_array().ok_or(error::Error::new(format!(
+            "Unable to parse ZoneTiles array from '{}'",
+            data
+        )))? {
+            let tile_id: &str = tile_value["id"].as_str().ok_or(error::Error::new(format!(
+                "Unable to find tile id in '{}'",
+                tile_value
+            )))?;
+            let char: u16 = tile_value["char"]
+                .as_str()
+                .ok_or(error::Error::new(format!(
+                    "Unable to find tile char in '{}'",
+                    tile_value
+                )))?
+                .chars()
+                .nth(0)
+                .ok_or(error::Error::new(format!(
+                    "Unable to find tile id in '{}'",
+                    tile_value
+                )))? as u16;
 
             codes.insert(char, tile_id.to_string());
             // TODO evolve browseables schema (WALKING, etc)
@@ -32,7 +50,7 @@ impl ZoneTiles {
             }
         }
 
-        ZoneTiles { codes, browseables }
+        Ok(ZoneTiles { codes, browseables })
     }
 
     pub fn tile_id(&self, code: u16) -> String {

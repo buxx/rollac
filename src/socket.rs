@@ -3,7 +3,6 @@ extern crate websocket;
 use self::websocket::OwnedMessage;
 use async_std::channel::{unbounded, Receiver, Sender};
 use async_std::task;
-use std::io::Error;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::thread;
@@ -74,7 +73,7 @@ impl Channel {
         let ws_reader_closed = Arc::clone(&self.ws_reader_closed);
         let ws_sender_closed = Arc::clone(&self.ws_sender_closed);
         let ws_client = self.create_ws_client()?;
-        let (mut ws_reader, mut ws_writer) = ws_client.split().unwrap();
+        let (mut ws_reader, mut ws_writer) = ws_client.split()?;
 
         // ws reader
         let ws_reader_handle = thread::spawn(move || {
@@ -125,7 +124,9 @@ impl Channel {
                 }
             });
 
-            let mut closed = ws_reader_closed.lock().unwrap();
+            let mut closed = ws_reader_closed
+                .lock()
+                .expect("Fail to acquire ws_reader_closed lock");
             *closed = true;
             log::info!("Web socket reader is closed");
         });
@@ -133,7 +134,9 @@ impl Channel {
         // ws sender
         let ws_sender_handle = thread::spawn(move || {
             task::block_on(async {
-                let from_main_receiver = from_main_receiver.lock().unwrap();
+                let from_main_receiver = from_main_receiver
+                    .lock()
+                    .expect("Fail to acquire from_main_receiver lock");
 
                 while let Ok(received) = from_main_receiver.recv().await {
                     let message_json_str = match serde_json::to_string(&received) {
@@ -157,7 +160,9 @@ impl Channel {
                 log::info!("Web socker writer is closed");
             });
 
-            let mut closed = ws_sender_closed.lock().unwrap();
+            let mut closed = ws_sender_closed
+                .lock()
+                .expect("Fail to acquire ws_sender_closed lock");
             *closed = true;
         });
 
@@ -173,7 +178,7 @@ impl Channel {
         }
     }
 
-    pub async fn close(&mut self) -> Result<(), Error> {
+    pub async fn close(&mut self) -> Result<(), error::Error> {
         self.closing = true;
         self.send(event::ZoneEvent {
             event_type: event::ZoneEventType::ClientWantClose,
@@ -186,14 +191,20 @@ impl Channel {
         let start = SystemTime::now();
         let timeout = Duration::from_secs(5);
         loop {
-            let ws_sender_closed = *self.ws_sender_closed.lock().unwrap();
-            let ws_reader_closed = *self.ws_reader_closed.lock().unwrap();
+            let ws_sender_closed = *self
+                .ws_sender_closed
+                .lock()
+                .expect("Fail to acquire ws_sender_closed lock");
+            let ws_reader_closed = *self
+                .ws_reader_closed
+                .lock()
+                .expect("Fail to acquire ws_reader_closed lock");
 
             if ws_sender_closed && ws_reader_closed {
                 break;
             }
 
-            if start.elapsed().unwrap() > timeout {
+            if start.elapsed()? > timeout {
                 log::error!(
                     "WebSockets: timeout reached, force closing (ws_sender_closed: {}, ws_reader_closed: {})",
                     ws_sender_closed, ws_reader_closed

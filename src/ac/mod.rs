@@ -4,10 +4,11 @@ use async_std::channel::Sender;
 use async_std::sync::Mutex;
 use async_std::task::sleep;
 use serde_derive::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{Value};
 
 use crate::ac::generic::Generic;
 use crate::ac::hare::Hare;
+use crate::error;
 use crate::event::ZoneEvent;
 use crate::message::{Message, ZoneMessage};
 use crate::zone::Zone;
@@ -27,11 +28,10 @@ pub enum Type {
 
 pub fn animated_corpse_from_value(
     value: Value,
-) -> Result<Box<dyn AnimatedCorpse + Send + Sync>, String> {
-    let base: AnimatedCorpseBase = serde_json::from_value(value.clone()).unwrap();
-    let type_ = value["type_"].as_str().unwrap();
-    match type_ {
-        "HARE" => Ok(Box::new(Hare::new(base))),
+) -> Result<Box<dyn AnimatedCorpse + Send + Sync>, error::Error> {
+    let base: AnimatedCorpseBase = serde_json::from_value(value.clone())?;
+    match base.type_ {
+        Type::HARE => Ok(Box::new(Hare::new(base))),
         _ => Ok(Box::new(Generic::new(base))),
     }
 }
@@ -108,8 +108,9 @@ pub async fn animate(zones: &Mutex<Vec<Zone>>, channel_sender: &Sender<Message>)
         };
 
         for message in messages {
-            if let Err(_) = channel_sender.send(message).await {
-                panic!("Channel is closed !")
+            if let Err(err) = channel_sender.send(message).await {
+                log::error!("Message channel is closed (from animate): {}", err);
+                break
             };
         }
 

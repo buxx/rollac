@@ -18,7 +18,7 @@ pub enum ClientError {
     NotFound { message: String },
     ClientSideError { message: String },
     ServerSideError { message: String },
-    InternalError,
+    InternalError { message: String },
 }
 
 impl Error for ClientError {}
@@ -33,14 +33,18 @@ impl ClientError {
             ClientError::ServerSideError { message } => {
                 format!("Server side error: {}", message).to_string()
             }
-            ClientError::InternalError => format!("Internal error"),
+            ClientError::InternalError { message } => {
+                format!("Internal error: {}", message).to_string()
+            }
         };
     }
 }
 
 impl From<reqwest::Error> for ClientError {
-    fn from(_: reqwest::Error) -> Self {
-        Self::InternalError
+    fn from(err: reqwest::Error) -> Self {
+        Self::InternalError {
+            message: format!("{}", err),
+        }
     }
 }
 
@@ -168,7 +172,11 @@ impl Client {
         Ok(response.text()?)
     }
 
-    pub fn get_zone_data(&self, world_row_i: u32, world_col_i: u32) -> Result<Value, ClientError> {
+    pub fn get_zone_source(
+        &self,
+        world_row_i: u32,
+        world_col_i: u32,
+    ) -> Result<String, ClientError> {
         let url = format!(
             "{}/zones/{}/{}",
             self.get_base_path(),
@@ -176,7 +184,15 @@ impl Client {
             world_col_i
         );
         let response: Response = self.check_response(self.client.get(url.as_str()).send()?)?;
-        Ok(response.json::<Value>()?)
+        let response_value = response.json::<Value>()?;
+        match response_value["raw_source"].as_str() {
+            None => {
+                return Err(ClientError::InternalError {
+                    message: "Response do not contains raw_source key".to_string(),
+                })
+            }
+            Some(raw_source) => Ok(raw_source.to_string()),
+        }
     }
 
     pub fn get_tiles_data(&self) -> Result<Value, ClientError> {

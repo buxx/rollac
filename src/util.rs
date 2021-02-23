@@ -1,6 +1,8 @@
+use crate::error;
+
 pub const BLOCK_GEO: &str = "GEO";
 
-pub fn extract_block_from_source(block_name: &str, source: &str) -> Result<String, String> {
+pub fn extract_block_from_source(block_name: &str, source: &str) -> Result<String, error::Error> {
     let mut block_found = false;
     let mut block_lines: Vec<&str> = Vec::new();
 
@@ -21,7 +23,10 @@ pub fn extract_block_from_source(block_name: &str, source: &str) -> Result<Strin
     if block_found {
         return Ok(block_lines.join("\n"));
     }
-    Err(format!("Block \"{}\" not found", block_name))
+    Err(error::Error::new(format!(
+        "Block \"{}\" not found",
+        block_name
+    )))
 }
 
 pub fn longest_line(text: &str) -> Option<&str> {

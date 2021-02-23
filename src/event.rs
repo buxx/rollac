@@ -258,8 +258,9 @@ pub async fn on_events(
         }
 
         for message in messages {
-            if let Err(_) = channel_sender.send(message).await {
-                panic!("Channel is closed !")
+            if let Err(err) = channel_sender.send(message).await {
+                log::error!("Message channel is closed (from on_events): {}", err);
+                break
             }
         }
     }

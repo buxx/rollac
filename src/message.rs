@@ -61,6 +61,5 @@ pub async fn on_messages(
         }
     }
 
-    // TODO: manage daemon close
-    panic!("Channel is closed !");
+    log::error!("Message channel is closed (from on_messages)")
 }

@@ -52,7 +52,7 @@ async fn daemon() -> Result<(), error::Error> {
 
     // Grab world information
     log::info!("Retrieve world from api");
-    let world = world::new(&client);
+    let world = world::new(&client)?;
 
     // Create zones and place animated corpses
     let mut found_animated_corpses = 0;
@@ -75,7 +75,7 @@ async fn daemon() -> Result<(), error::Error> {
                 world_row_i as u32,
                 world_col_i as u32,
                 zone_animated_corpses,
-            ));
+            )?);
         }
     }
     log::info!(
