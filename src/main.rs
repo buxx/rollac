@@ -32,20 +32,25 @@ struct Opt {
 
     #[structopt(name = "port", default_value = "5000")]
     port: u16,
+
+    #[structopt(short, long)]
+    secure: bool,
 }
 
 async fn daemon() -> Result<(), error::Error> {
     let opt = Opt::from_args();
     let host: String = opt.host;
     let port: u16 = opt.port;
+    let secure: bool = opt.secure;
+    let protocol = if secure { "https" } else { "http" };
 
     // Prepare required variables
     let mut zones: Vec<Zone> = vec![];
-    let client = client::Client::new(&host, port);
+    let client = client::Client::new(&host, port, secure);
     let (channel_sender, channel_receiver) = unbounded();
 
     // Connect to world socket
-    let url = format!("http://{}:{}/world/events", host, port);
+    let url = format!("{}://{}:{}/world/events", protocol, host, port);
     log::info!("Connect socket on {}", url);
     let mut socket = socket::Channel::new(url);
     socket.connect()?;
