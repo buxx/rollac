@@ -64,21 +64,23 @@ impl fmt::Display for ClientError {
 pub struct Client {
     server_ip: String,
     server_port: u16,
+    secure: bool,
     client: reqwest::blocking::Client,
 }
 
 impl Client {
-    pub fn new(server_ip: &str, server_port: u16) -> Self {
+    pub fn new(server_ip: &str, server_port: u16, secure: bool) -> Self {
         Self {
             server_ip: String::from(server_ip),
             server_port,
+            secure,
             client: reqwest::blocking::Client::new(),
         }
     }
 
     fn get_base_path(&self) -> String {
-        // TODO https
-        return format!("http://{}:{}", self.server_ip, self.server_port);
+        let protocol = if self.secure { "https" } else { "http" };
+        return format!("{}://{}:{}", protocol, self.server_ip, self.server_port);
     }
 
     fn check_response(&self, response: Response) -> Result<Response, ClientError> {
