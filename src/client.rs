@@ -7,6 +7,9 @@ use serde_derive::{Deserialize, Serialize};
 use serde_json::Value;
 use std::error::Error;
 use std::fmt;
+use reqwest::Method;
+
+const HEADER_NAME__DISABLE_AUTH_TOKEN: &str = "DISABLE_AUTH_TOKEN";
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ErrorResponse {
@@ -65,15 +68,17 @@ pub struct Client {
     server_ip: String,
     server_port: u16,
     secure: bool,
+    disable_auth_token: String,
     client: reqwest::blocking::Client,
 }
 
 impl Client {
-    pub fn new(server_ip: &str, server_port: u16, secure: bool) -> Self {
+    pub fn new(server_ip: &str, server_port: u16, secure: bool, disable_auth_token: String) -> Self {
         Self {
             server_ip: String::from(server_ip),
             server_port,
             secure,
+            disable_auth_token,
             client: reqwest::blocking::Client::new(),
         }
     }
@@ -135,6 +140,28 @@ impl Client {
         Ok(animated_corpses)
     }
 
+    pub fn get_animated_corpse(
+        &self,
+        animated_corpse_id: u32,
+    ) -> Result<Box<dyn AnimatedCorpse + Send + Sync>, ClientError> {
+        let url = format!(
+            "{}/ac/{}",
+            self.get_base_path(),
+            animated_corpse_id,
+        );
+        let response: Response = self.check_response(self.client.get(url.as_str()).send()?)?;
+
+        let value = response.json::<Value>()?;
+        match animated_corpse_from_value(value) {
+            Ok(animated_corpse) => {
+                Ok(animated_corpse)
+            }
+            Err(msg) => {
+                Err(ClientError::ClientSideError { message: format!("{}", msg)})
+            }
+        }
+    }
+
     pub fn get_zone_characters(
         &self,
         world_row_i: u32,
@@ -146,7 +173,15 @@ impl Client {
             world_row_i,
             world_col_i
         );
-        let response: Response = self.check_response(self.client.get(url.as_str()).send()?)?;
+        let response: Response = self.check_response(
+            self.client.request(
+                Method::GET,
+                url.as_str(),
+            ).header(
+                HEADER_NAME__DISABLE_AUTH_TOKEN,
+                &self.disable_auth_token
+            ).send()?
+        )?;
 
         Ok(response.json::<Vec<model::Character>>()?)
     }
@@ -157,13 +192,20 @@ impl Client {
         world_col_i: u32,
     ) -> Result<Vec<model::Build>, ClientError> {
         let url = format!(
-            "{}/zones/{}/{}/builds",
+            "{}/zones/{}/{}/builds?disable_door_compute=1",
             self.get_base_path(),
             world_row_i,
             world_col_i
         );
-        let response: Response = self.check_response(self.client.get(url.as_str()).send()?)?;
-
+        let response: Response = self.check_response(
+            self.client.request(
+                Method::GET,
+                url.as_str(),
+            ).header(
+                HEADER_NAME__DISABLE_AUTH_TOKEN,
+                &self.disable_auth_token
+            ).send()?
+        )?;
         Ok(response.json::<Vec<model::Build>>()?)
     }
 
@@ -185,7 +227,15 @@ impl Client {
             world_row_i,
             world_col_i
         );
-        let response: Response = self.check_response(self.client.get(url.as_str()).send()?)?;
+        let response: Response = self.check_response(
+            self.client.request(
+                Method::GET,
+                url.as_str(),
+            ).header(
+                HEADER_NAME__DISABLE_AUTH_TOKEN,
+                &self.disable_auth_token
+            ).send()?
+        )?;
         let response_value = response.json::<Value>()?;
         match response_value["raw_source"].as_str() {
             None => {

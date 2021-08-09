@@ -46,7 +46,7 @@ impl World {
         })
     }
 
-    pub fn tile_id(&self, row_i: i32, col_i: i32) -> Option<String> {
+    pub fn _tile_id(&self, row_i: i32, col_i: i32) -> Option<String> {
         if row_i < 0 || col_i < 0 {
             return None;
         }

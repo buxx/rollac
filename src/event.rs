@@ -18,6 +18,7 @@ pub const SERVER_PERMIT_CLOSE: &str = "SERVER_PERMIT_CLOSE";
 pub const CHARACTER_ENTER_ZONE: &str = "CHARACTER_ENTER_ZONE";
 pub const CHARACTER_EXIT_ZONE: &str = "CHARACTER_EXIT_ZONE";
 pub const NEW_BUILD: &str = "NEW_BUILD";
+pub const NEW_ANIMATED_CORPSE: &str = "NEW_ANIMATED_CORPSE";
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(untagged)]
@@ -44,6 +45,9 @@ pub enum ZoneEventType {
     },
     NewBuild {
         build: model::Build,
+    },
+    NewAnimatedCorpse {
+        animated_corpse_id: u32,
     },
 }
 
@@ -149,6 +153,14 @@ impl ZoneEvent {
                     },
                 })
             }
+            &NEW_ANIMATED_CORPSE => Ok(ZoneEvent {
+                world_row_i,
+                world_col_i,
+                event_type_name: String::from(NEW_ANIMATED_CORPSE),
+                event_type: ZoneEventType::NewAnimatedCorpse {
+                    animated_corpse_id: data["animated_corpse_id"].as_i64().expect(DE_ERR_MSG) as u32,
+                },
+            }),
             _ => Err(Error::new(format!("Unknown event {}", &type_))),
         }
     }
@@ -246,6 +258,12 @@ pub async fn on_events(
             ZoneEventType::NewBuild { build } => {
                 messages.push(Message::Zone(
                     ZoneMessage::AddBuild(build.clone()),
+                    (event.world_row_i, event.world_col_i),
+                ));
+            }
+            ZoneEventType::NewAnimatedCorpse { animated_corpse_id} => {
+                messages.push(Message::Zone(
+                    ZoneMessage::AddAnimatedCorpse(*animated_corpse_id),
                     (event.world_row_i, event.world_col_i),
                 ));
             }

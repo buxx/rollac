@@ -24,6 +24,7 @@ pub enum ZoneMessage {
     UpdateCharacterPosition(CharacterId, ZoneRowI, ZoneColI),
     AddBuild(model::Build),
     AddCharacter(CharacterId, ZoneRowI, ZoneColI), // FIXME model::Character
+    AddAnimatedCorpse(AnimatedCorpseId),
     RemoveCharacter(CharacterId),
 }
 

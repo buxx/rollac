@@ -26,7 +26,7 @@ pub struct Channel {
     ws_reader_closed: Arc<Mutex<bool>>,
     ws_sender_handle: Option<JoinHandle<()>>,
     ws_sender_closed: Arc<Mutex<bool>>,
-    closing: bool,
+    _closing: bool,
 }
 
 impl Channel {
@@ -48,7 +48,7 @@ impl Channel {
             ws_sender_closed,
             from_websocket_sender,
             from_websocket_receiver,
-            closing: false,
+            _closing: false,
         }
     }
 
@@ -178,8 +178,8 @@ impl Channel {
         }
     }
 
-    pub async fn close(&mut self) -> Result<(), error::Error> {
-        self.closing = true;
+    pub async fn _close(&mut self) -> Result<(), error::Error> {
+        self._closing = true;
         self.send(event::ZoneEvent {
             event_type: event::ZoneEventType::ClientWantClose,
             event_type_name: String::from(event::CLIENT_WANT_CLOSE),

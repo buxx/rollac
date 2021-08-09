@@ -1,6 +1,6 @@
 use crate::ac::AnimatedCorpse;
 use crate::behavior::get_behaviors_for;
-use crate::client::Client;
+use crate::client::{Client};
 use crate::error;
 use crate::event::ZoneEvent;
 use crate::message::{Message, ZoneMessage};
@@ -26,6 +26,7 @@ pub struct Zone {
     pub rows: Vec<LevelRow>,
     pub world_tile_type_id: TileId,
     pub tiles: ZoneTiles,
+    pub client: Client,
 }
 
 impl Zone {
@@ -38,6 +39,7 @@ impl Zone {
         zone_raw: &str,
         tiles: ZoneTiles,
         world_tile_type_id: String,
+        client: Client,
     ) -> Result<Self, error::Error> {
         let height = zone_raw.lines().count() as i32;
         let longest_line = if let Some(longest_line) = util::longest_line(zone_raw) {
@@ -72,6 +74,7 @@ impl Zone {
             rows,
             world_tile_type_id,
             tiles,
+            client,
         })
     }
 
@@ -161,6 +164,17 @@ impl Zone {
             ZoneMessage::AddBuild(build) => {
                 self.builds.push(build);
             }
+            ZoneMessage::AddAnimatedCorpse(animated_corpse_id) => {
+                match self.client.get_animated_corpse(animated_corpse_id) {
+                    Ok(animated_corpse) => {
+                        self.animated_corpses.push(animated_corpse)
+                    }
+                    Err(err) => {
+                        eprintln!("Fail to add animated corpse : {}", err)
+                    }
+                }
+
+            }
         }
     }
 
@@ -222,12 +236,15 @@ pub fn new(
     animated_corpses: Vec<Box<dyn AnimatedCorpse + Send + Sync>>,
 ) -> Result<Zone, error::Error> {
     let world_tile_type_id = world.rows[world_row_i as usize].cols[world_col_i as usize].clone();
+    log::debug!("Zone {}.{}: grab tiles data", world_row_i, world_col_i);
     let server_tiles_data = client.get_tiles_data()?;
     let zone_tiles = ZoneTiles::new(server_tiles_data)?;
+    log::debug!("Zone {}.{}: grab source", world_row_i, world_col_i);
     let zone_raw = client.get_zone_source(world_row_i as u32, world_col_i as u32)?;
     let zone_raw = util::extract_block_from_source(util::BLOCK_GEO, &zone_raw)?;
-
+    log::debug!("Zone {}.{}: grab characters", world_row_i, world_col_i);
     let zone_characters = client.get_zone_characters(world_row_i as u32, world_col_i as u32)?;
+    log::debug!("Zone {}.{}: grab builds", world_row_i, world_col_i);
     let zone_builds = client.get_zone_builds(world_row_i as u32, world_col_i as u32)?;
 
     Ok(Zone::new(
@@ -239,5 +256,6 @@ pub fn new(
         &zone_raw,
         zone_tiles,
         world_tile_type_id,
+        client.clone(),
     )?)
 }

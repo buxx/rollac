@@ -33,6 +33,9 @@ struct Opt {
     #[structopt(name = "port", default_value = "5000")]
     port: u16,
 
+    #[structopt(name = "disable_auth_token", default_value = "1234")]
+    disable_auth_token: String,
+
     #[structopt(short, long)]
     secure: bool,
 }
@@ -42,11 +45,12 @@ async fn daemon() -> Result<(), error::Error> {
     let host: String = opt.host;
     let port: u16 = opt.port;
     let secure: bool = opt.secure;
+    let disable_auth_token: String = opt.disable_auth_token;
     let protocol = if secure { "https" } else { "http" };
 
     // Prepare required variables
     let mut zones: Vec<Zone> = vec![];
-    let client = client::Client::new(&host, port, secure);
+    let client = client::Client::new(&host, port, secure, disable_auth_token);
     let (channel_sender, channel_receiver) = unbounded();
 
     // Connect to world socket
