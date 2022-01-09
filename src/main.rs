@@ -22,7 +22,7 @@ mod util;
 mod world;
 mod zone;
 
-const TICK_EACH_MS: u64 = 1000;
+const TICK_EACH_MS: u64 = 5000;
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "basic")]
